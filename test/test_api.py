@@ -775,3 +775,15 @@ class TestAPI:
                    .filter_by(task_id=t['id'])\
                    .all()
             assert len(tr) == 0, "There should not be any task run for task"
+
+    def test_11_app_name_case_sensitive(self):
+        """Test API app names are case insensitive works"""
+        # API calls should be case insensitive
+        url = '/api/app?short_name=TeSt-ApP'
+        res = self.app.get(url, follow_redirects=True)
+        app = db.session.query(model.App).get(1)
+        apps = json.loads(res.data)
+        err_msg = "There should be only 1 app returned but there are %s" % len(apps)
+        assert len(apps) == 1, err_msg
+        err_msg = "The app.id should be %s but it is %s" % (app.id, apps[0]['id'])
+        assert apps[0]['id'] == app.id, err_msg

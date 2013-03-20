@@ -68,7 +68,11 @@ class APIBase(MethodView):
                             return Response(json.dumps({
                                 'error': 'no such column: %s' % k}
                                 ), mimetype='application/json')
-                        query = query.filter(getattr(self.__class__, k) == request.args[k])
+                        elif k == 'short_name':
+                            query = query.filter(getattr(self.__class__, k) == request.args[k].lower())
+                        else:
+                            query = query.filter(getattr(self.__class__, k) == request.args[k])
+
 
                 try:
                     limit = min(10000, int(request.args.get('limit')))
