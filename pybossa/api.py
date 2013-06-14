@@ -40,7 +40,7 @@ def index():
 
 class APIBase(MethodView):
     """
-    Class to create CRUD methods for all the items: applications,
+    Class to create CRUD methods for all the items: projects,
     tasks and task runs.
     """
     hateoas = Hateoas()
@@ -222,8 +222,8 @@ class APIBase(MethodView):
         pass
 
 
-class AppAPI(APIBase):
-    __class__ = model.App
+class ProjectAPI(APIBase):
+    __class__ = model.Project
 
     def _update_object(self, obj):
         obj.owner = current_user
@@ -256,15 +256,15 @@ def register_api(view, endpoint, url, pk='id', pk_type='int'):
                            view_func=view_func,
                            methods=['GET', 'PUT', 'DELETE', 'OPTIONS'])
 
-register_api(AppAPI, 'api_app', '/app', pk='id', pk_type='int')
+register_api(ProjectAPI, 'api_project', '/project', pk='id', pk_type='int')
 register_api(TaskAPI, 'api_task', '/task', pk='id', pk_type='int')
 register_api(TaskRunAPI, 'api_taskrun', '/taskrun', pk='id', pk_type='int')
 
 
 @jsonpify
-@blueprint.route('/app/<app_id>/newtask')
+@blueprint.route('/project/<project_id>/newtask')
 @crossdomain(origin='*', headers=cors_headers)
-def new_task(app_id):
+def new_task(project_id):
     # Check if the request has an arg:
     if request.args.get('offset'):
         offset = int(request.args.get('offset'))
@@ -273,7 +273,7 @@ def new_task(app_id):
 
     user_id = None if current_user.is_anonymous() else current_user.id
     user_ip = request.remote_addr if current_user.is_anonymous() else None
-    task = sched.new_task(app_id, user_id, user_ip, offset)
+    task = sched.new_task(project_id, user_id, user_ip, offset)
     # If there is a task for the user, return it
     if task:
         return Response(json.dumps(task.dictize()), mimetype="application/json")
@@ -283,9 +283,9 @@ def new_task(app_id):
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
-@blueprint.route('/app/<int:app_id>/userprogress')
+@blueprint.route('/app/<int:project_id>/userprogress')
 @crossdomain(origin='*', headers=cors_headers)
-def user_progress(app_id=None, short_name=None):
+def user_progress(project_id=None, short_name=None):
     """Return a JSON object with two fields regarding the tasks for the user:
         { 'done': 10,
           'total: 100
@@ -293,28 +293,28 @@ def user_progress(app_id=None, short_name=None):
        This will mean that the user has done a 10% of the available tasks for
        him
     """
-    if app_id or short_name:
+    if project_id or short_name:
         if short_name:
-            app = db.session.query(model.App)\
-                    .filter(model.App.short_name == short_name)\
+            project = db.session.query(model.Project)\
+                    .filter(model.Project.short_name == short_name)\
                     .first()
-        if app_id:
-            app = db.session.query(model.App)\
-                    .get(app_id)
+        if project_id:
+            project = db.session.query(model.Project)\
+                    .get(project_id)
 
-        if app:
+        if project:
             if current_user.is_anonymous():
                 tr = db.session.query(model.TaskRun)\
-                       .filter(model.TaskRun.app_id == app.id)\
+                       .filter(model.TaskRun.project_id == project.id)\
                        .filter(model.TaskRun.user_ip == request.remote_addr)\
                        .all()
             else:
                 tr = db.session.query(model.TaskRun)\
-                       .filter(model.TaskRun.app_id == app.id)\
+                       .filter(model.TaskRun.project_id == project.id)\
                        .filter(model.TaskRun.user_id == current_user.id)\
                        .all()
             # Return
-            tmp = dict(done=len(tr), total=len(app.tasks))
+            tmp = dict(done=len(tr), total=len(project.tasks))
             return Response(json.dumps(tmp), mimetype="application/json")
         else:
             return abort(404)
