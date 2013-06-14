@@ -28,7 +28,7 @@ import pybossa.stats as stats
 import pybossa.validator as pb_validator
 
 from pybossa.core import db
-from pybossa.model import App, Task
+from pybossa.model import Project, Task
 from pybossa.util import Pagination, UnicodeWriter, admin_required
 from pybossa.auth import require
 from pybossa.cache import projects as cached_projects
