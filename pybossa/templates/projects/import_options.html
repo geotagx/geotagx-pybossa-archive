@@ -1,7 +1,7 @@
 {% extends "/base.html" %}
-{% set active_page = "applications" %}
+{% set active_page = "projects" %}
 {% set active_app  = app.short_name %}
-{% import "applications/_helpers.html" as helper %}
+{% import "/_helpers.html" as helper %}
 
 {% block content %}
 {% from "_formhelpers.html" import render_field %}
@@ -11,7 +11,7 @@
     </div>
     <div class="span9">
         {{ helper.render_app_title(app, subtitle=_('Import Tasks'))}}
-        {% include "applications/tasks/options.html" %}
+        {% include "projects/tasks/options.html" %}
     </div>
 </div>
 {% endblock %}

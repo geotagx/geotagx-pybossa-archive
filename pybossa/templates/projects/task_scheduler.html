@@ -1,17 +1,17 @@
 {% extends "/base.html" %}
-{% set active_page = "applications" %}
+{% set active_page = "projects" %}
 {% set active_link  = "tasks" %}
-{% import "applications/_helpers.html" as helper %}
+{% import "projects/_helpers.html" as helper %}
 {% from "_formhelpers.html" import render_field %}
 
 {% block content %}
-{% if app %}
+{% if project %}
         <div class="row">
             <div class="span3">
-                {{ helper.render_app_local_nav(app, 'tasks', current_user) }}
+                {{ helper.render_project_local_nav(project, 'tasks', current_user) }}
             </div>
             <div class="span9">
-                {{ helper.render_app_title(app, subtitle=_('Task Scheduler'))}}
+                {{ helper.render_project_title(project, subtitle=_('Task Scheduler'))}}
                 <p>You can choose from the following schedulers:</p>
                 <ul>
                     <li><strong>Default</strong> or <strong>Depth First</strong>: returns a task that has not been completed (the value of number of answers has not achieved) excluding the current user.</li>
@@ -19,13 +19,13 @@
                     <li><strong>Random</strong>: returns a task randomly (a user could get the same task twice or more times).</li>
                 </ul>
 
-                <form id="task_scheduler" class="form-horizontal" method="post" action="{{ url_for('app.task_scheduler', short_name=app.short_name) }}">
+                <form id="task_scheduler" class="form-horizontal" method="post" action="{{ url_for('project.task_scheduler', short_name=project.short_name) }}">
                     {{ form.hidden_tag() }}
                     <fieldset>
-                        {{ render_field(form.sched, class_="span4", placeholder="Task scheduler for your app")}}
+                        {{ render_field(form.sched, class_="span4", placeholder="Task scheduler for your project")}}
                         <div class="form-actions">
                             <input type="submit" value={{_('Set redundancy')}} class="btn btn-primary" />
-                            <a href="{{url_for('app.tasks', short_name=app.short_name)}}" class="btn">{{_('Cancel')}}</a>
+                            <a href="{{url_for('project.tasks', short_name=project.short_name)}}" class="btn">{{_('Cancel')}}</a>
                         </div>
                     </fieldset>
                 </form>
@@ -33,7 +33,7 @@
         </div>
 {% else %}
   <div class="page-header">
-      <h1>{{_('Sorry! This app does not exists')}}.</h1>
+      <h1>{{_('Sorry! This project does not exists')}}.</h1>
   </div>
 {% endif %}
 {{ helper.broken_image() }}

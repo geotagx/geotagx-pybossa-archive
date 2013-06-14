@@ -1,24 +1,24 @@
 {% extends "/base.html" %}
-{% set active_page = "applications" %}
+{% set active_page = "projects" %}
 {% set active_link  = "tasks" %}
-{% import "applications/_helpers.html" as helper %}
+{% import "projects/_helpers.html" as helper %}
 {% from "_formhelpers.html" import render_field %}
 
 {% block content %}
-{% if app %}
+{% if project %}
         <div class="row">
             <div class="span3">
-                {{ helper.render_app_local_nav(app, 'tasks', current_user) }}
+                {{ helper.render_project_local_nav(project, 'tasks', current_user) }}
             </div>
             <div class="span9">
-                {{ helper.render_app_title(app, subtitle=_('Task Redundancy'))}}
-                <form id="task_redundancy" class="form-horizontal" method="post" action="{{ url_for('app.task_n_answers', short_name=app.short_name) }}">
+                {{ helper.render_project_title(project, subtitle=_('Task Redundancy'))}}
+                <form id="task_redundancy" class="form-horizontal" method="post" action="{{ url_for('project.task_n_answers', short_name=project.short_name) }}">
                     {{ form.hidden_tag() }}
                     <fieldset>
-                        {{ render_field(form.n_answers, class_="input-block-level", placeholder= _('The number of answers per tasks that you want for the application')) }}
+                        {{ render_field(form.n_answers, class_="input-block-level", placeholder= _('The number of answers per tasks that you want for the project')) }}
                         <div class="form-actions">
                             <input type="submit" value={{_('Set redundancy')}} class="btn btn-primary" />
-                            <a href="{{url_for('app.tasks', short_name=app.short_name)}}" class="btn">{{_('Cancel')}}</a>
+                            <a href="{{url_for('project.tasks', short_name=project.short_name)}}" class="btn">{{_('Cancel')}}</a>
                         </div>
                     </fieldset>
                 </form>
@@ -26,7 +26,7 @@
         </div>
 {% else %}
   <div class="page-header">
-      <h1>{{_('Sorry! This app does not exists')}}.</h1>
+      <h1>{{_('Sorry! This project does not exists')}}.</h1>
   </div>
 {% endif %}
 {{ helper.broken_image() }}

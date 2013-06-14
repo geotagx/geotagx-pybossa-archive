@@ -1,21 +1,21 @@
 {% extends "/base.html" %}
-{% set active_page = "applications" %}
-{% set active_app  = "all" %}
-{% import "applications/_helpers.html" as helper %}
+{% set active_page = "projects" %}
+{% set active_project  = "all" %}
+{% import "projects/_helpers.html" as helper %}
 
 {% block content %}
-{% if app %}
+{% if project %}
         <div class="row">
             <div class="span3">
-                {{ helper.render_app_local_nav(app, 'tasks', current_user) }}
+                {{ helper.render_project_local_nav(project, 'tasks', current_user) }}
             </div>
             <div class="span9">
-                {{ helper.render_app_title(app, subtitle='Browse Tasks') }}
+                {{ helper.render_project_title(project, subtitle='Browse Tasks') }}
                 <hr>
-                <p>{{_('This page shows all the available tasks for this application')}}.</p> 
+                <p>{{_('This page shows all the available tasks for this project')}}.</p> 
                 <p>{{_('For each task, you can find the following information')}}:
                   <ul>
-                      <li><strong>{{_('Task')}} </strong><span class="label label-info">#0000</span> {{_('This number identifies the task for the application and it is unique')}}</li>
+                      <li><strong>{{_('Task')}} </strong><span class="label label-info">#0000</span> {{_('This number identifies the task for the project and it is unique')}}</li>
                       <li><strong>0 of 30</strong>: {{_('The first number shows how many answers have been submitted for the task and the')}} <a data-placement="top" rel="tooltip" href="#" data-original-title="{{_('This redundancy method will help to detect errors, typos, data forging, etc. when the task has been completed')}}">{{_('second number')}}</a> {{_('how many need to be obtained to mark the task as')}} <strong>{{_('completed')}}</strong>. </li>
                       <li><strong>{{_('Progress Bar')}}</strong>: {{_('The progress bar will the percentage that has been completed for the task')}}.</li>
                   </ul>
@@ -47,8 +47,8 @@
                         {% endif %}
                         <div class="span4">
                         {% if task_pct >= 100 %}
-                            <a class="btn btn-warning" href="{{ url_for('app.export', 
-                                short_name=app.short_name,
+                            <a class="btn btn-warning" href="{{ url_for('project.export', 
+                                short_name=project.short_name,
                                 task_id=t.id) }}"><i class="icon-download"></i> {{_('Download results')}}</a>
                          {% endif %}
                         </div>
@@ -59,7 +59,7 @@
                 {{ helper.render_pagination(pagination, _('Tasks')) }}
 {% else %}
   <div class="page-header">
-      <h1>{{_('Sorry! This app does not exists')}}.</h1>
+      <h1>{{_('Sorry! This project does not exists')}}.</h1>
   </div>
 {% endif %}
 <script>

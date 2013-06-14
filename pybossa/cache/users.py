@@ -73,35 +73,35 @@ def get_user_summary(name):
 
         # Get the APPs where the USER has participated
         sql = text('''
-                   SELECT app.id, app.name, app.short_name, app.info,
-                   COUNT(task_run.app_id) AS n_answers FROM app, task_run
-                   WHERE app.id=task_run.app_id AND
-                   task_run.user_id=:user_id GROUP BY app.id
+                   SELECT project.id, project.name, project.short_name, project.info,
+                   COUNT(task_run.project_id) AS n_answers FROM project, task_run
+                   WHERE project.id=task_run.project_id AND
+                   task_run.user_id=:user_id GROUP BY project.id
                    ORDER BY n_answers DESC;
                    ''')
         results = db.engine.execute(sql, user_id=user['id'])
-        apps = []
+        projects = []
         for row in results:
-            app = dict(id=row.id, name=row.name, info=dict(json.loads(row.info)),
+            project = dict(id=row.id, name=row.name, info=dict(json.loads(row.info)),
                        short_name=row.short_name,
                        n_answers=row.n_answers)
-            apps.append(app)
+            projects.append(project)
 
         # Get the CREATED APPS by the USER
         sql = text('''
-                   SELECT app.id, app.name, app.short_name, app.info, app.created
-                   FROM app
-                   WHERE app.owner_id=:user_id
-                   ORDER BY app.created DESC;
+                   SELECT project.id, project.name, project.short_name, project.info, project.created
+                   FROM project
+                   WHERE project.owner_id=:user_id
+                   ORDER BY project.created DESC;
                    ''')
         results = db.engine.execute(sql, user_id=user['id'])
-        apps_created = []
+        projects_created = []
         for row in results:
-            app = dict(id=row.id, name=row.name,
+            project = dict(id=row.id, name=row.name,
                        short_name=row.short_name,
                        info=dict(json.loads(row.info)))
-            apps_created.append(app)
+            projects_created.append(project)
 
-        return user, apps, apps_created
+        return user, projects, projects_created
     else:
         return None, None, None
