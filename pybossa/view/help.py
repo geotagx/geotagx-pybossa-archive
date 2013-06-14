@@ -14,7 +14,7 @@
 # along with PyBOSSA.  If not, see <http://www.gnu.org/licenses/>.
 from flask import Blueprint
 from flask import render_template
-from pybossa.cache import apps as cached_apps
+from pybossa.cache import projects as cached_projects
 from pybossa.cache import categories as cached_cat
 from random import choice
 
@@ -25,13 +25,13 @@ blueprint = Blueprint('help', __name__)
 def api():
     """Render help/api page"""
     categories = cached_cat.get_used()
-    apps, count = cached_apps.get(categories[0]['short_name'])
-    if len(apps) > 0:
-        app_id = choice(apps)['id']
+    projects, count = cached_projects.get(categories[0]['short_name'])
+    if len(projects) > 0:
+        project_id = choice(projects)['id']
     else:
-        app_id = None
+        project_id = None
     return render_template('help/api.html', title="Help: API",
-                           app_id=app_id)
+                           project_id=project_id)
 
 
 @blueprint.route('/license')
