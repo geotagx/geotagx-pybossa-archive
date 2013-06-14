@@ -212,20 +212,20 @@ def profile():
     user = db.session.query(model.User).get(current_user.id)
 
     sql = text('''
-               SELECT app.name, app.short_name, app.info, COUNT(*) as n_task_runs
-               FROM task_run JOIN app ON
-               (task_run.app_id=app.id) WHERE task_run.user_id=:user_id
-               GROUP BY app.name, app.short_name, app.info
+               SELECT project.name, project.short_name, project.info, COUNT(*) as n_task_runs
+               FROM task_run JOIN project ON
+               (task_run.project_id=project.id) WHERE task_run.user_id=:user_id
+               GROUP BY project.name, project.short_name, project.info
                ORDER BY n_task_runs DESC;''')
 
-    # results will have the following format (app.name, app.short_name, n_task_runs)
+    # results will have the following format (project.name, project.short_name, n_task_runs)
     results = db.engine.execute(sql, user_id=current_user.id)
 
-    apps_contrib = []
+    projects_contrib = []
     for row in results:
-        app = dict(name=row.name, short_name=row.short_name,
+        project = dict(name=row.name, short_name=row.short_name,
                    info=json.loads(row.info), n_task_runs=row.n_task_runs)
-        apps_contrib.append(app)
+        projects_contrib.append(project)
 
     # Rank
     # See: https://gist.github.com/tokumine/1583695
@@ -246,46 +246,46 @@ def profile():
 
     user.total = db.session.query(model.User).count()
     return render_template('account/profile.html', title=lazy_gettext("Profile"),
-                           apps_contrib=apps_contrib,
+                           projects_contrib=projects_contrib,
                            user=user)
 
 
-@blueprint.route('/profile/applications')
+@blueprint.route('/profile/projects')
 @login_required
-def applications():
+def projects():
     user = User.query.get_or_404(current_user.id)
-    apps_published = []
-    apps_draft = []
+    projects_published = []
+    projects_draft = []
 
     sql = text('''
-               SELECT app.name, app.short_name, app.description,
-               app.info, count(task.app_id) as n_tasks
-               FROM app LEFT OUTER JOIN task ON (task.app_id=app.id)
-               WHERE app.owner_id=:user_id GROUP BY app.name, app.short_name,
-               app.description,
-               app.info;''')
+               SELECT project.name, project.short_name, project.description,
+               project.info, count(task.project_id) as n_tasks
+               FROM project LEFT OUTER JOIN task ON (task.project_id=project.id)
+               WHERE project.owner_id=:user_id GROUP BY project.name, project.short_name,
+               project.description,
+               project.info;''')
 
     results = db.engine.execute(sql, user_id=user.id)
     for row in results:
-        app = dict(name=row.name, short_name=row.short_name,
+        project = dict(name=row.name, short_name=row.short_name,
                    description=row.description,
                    info=json.loads(row.info), n_tasks=row.n_tasks,
                   )
-        if app['n_tasks'] > 0:
-            apps_published.append(app)
+        if project['n_tasks'] > 0:
+            projects_published.append(project)
         else:
-            apps_draft.append(app)
+            projects_draft.append(project)
 
-    return render_template('account/applications.html',
-                           title=lazy_gettext("Applications"),
-                           apps_published=apps_published,
-                           apps_draft=apps_draft)
+    return render_template('account/projects.html',
+                           title=lazy_gettext("Projects"),
+                           projects_published=projects_published,
+                           projects_draft=projects_draft)
 
 @blueprint.route('/profile/settings')
 @login_required
 def settings():
     #user = User.query.get_or_404(current_user.id)
-    user, apps, apps_created = cached_users.get_user_summary(current_user.name)
+    user, projects, projects_created = cached_users.get_user_summary(current_user.name)
     title = "User: %s &middot; Settings" % user['fullname']
     return render_template('account/settings.html',
                            title=title,
@@ -470,13 +470,13 @@ def reset_api_key():
 @blueprint.route('/<name>/')
 def public_profile(name):
     """Render the public user profile"""
-    user, apps, apps_created = cached_users.get_user_summary(name)
+    user, projects, projects_created = cached_users.get_user_summary(name)
     if user:
         title = "%s &middot; User Profile" % user['fullname']
         return render_template('/account/public_profile.html',
                                title=title,
                                user=user,
-                               apps=apps,
-                               apps_created=apps_created)
+                               projects=projects,
+                               projects_created=projects_created)
     else:
         abort(404)

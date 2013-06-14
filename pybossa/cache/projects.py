@@ -27,37 +27,37 @@ from datetime import timedelta
 
 STATS_TIMEOUT=50
 
-@cache.cached(key_prefix="front_page_featured_apps")
+@cache.cached(key_prefix="front_page_featured_projects")
 def get_featured_front_page():
-    """Return featured apps"""
-    sql = text('''SELECT app.id, app.name, app.short_name, app.info FROM
-               app, featured where app.id=featured.project_id and app.hidden=0''')
+    """Return featured projects"""
+    sql = text('''SELECT project.id, project.name, project.short_name, project.info FROM
+               project, featured where project.id=featured.project_id and project.hidden=0''')
     results = db.engine.execute(sql)
     featured = []
     for row in results:
-        app = dict(id=row.id, name=row.name, short_name=row.short_name,
+        project = dict(id=row.id, name=row.name, short_name=row.short_name,
                    info=dict(json.loads(row.info)))
-        featured.append(app)
+        featured.append(project)
     return featured
 
 
-@cache.cached(key_prefix="front_page_top_apps")
+@cache.cached(key_prefix="front_page_top_projects")
 def get_top(n=4):
-    """Return top n=4 apps"""
+    """Return top n=4 projects"""
     sql = text('''
-    SELECT app.id, app.name, app.short_name, app.description, app.info,
-    count(project_id) AS total FROM task_run, app WHERE project_id IS NOT NULL AND
-    app.id=project_id AND app.hidden=0 GROUP BY app.id ORDER BY total DESC LIMIT :limit;
+    SELECT project.id, project.name, project.short_name, project.description, project.info,
+    count(project_id) AS total FROM task_run, project WHERE project_id IS NOT NULL AND
+    project.id=project_id AND project.hidden=0 GROUP BY project.id ORDER BY total DESC LIMIT :limit;
     ''')
 
     results = db.engine.execute(sql, limit=n)
-    top_apps = []
+    top_projects = []
     for row in results:
-        app = dict(name=row.name, short_name=row.short_name,
+        project = dict(name=row.name, short_name=row.short_name,
                    description=row.description,
                    info=json.loads(row.info))
-        top_apps.append(app)
-    return top_apps
+        top_projects.append(project)
+    return top_projects
 
 
 @cache.memoize(timeout=60*5)
@@ -102,9 +102,9 @@ def last_activity(project_id):
         else:
             return None
 
-@cache.cached(key_prefix="number_featured_apps")
+@cache.cached(key_prefix="number_featured_projects")
 def n_featured():
-    """Return number of featured apps"""
+    """Return number of featured projects"""
     sql = text('''select count(*) from featured;''')
     results = db.engine.execute(sql)
     for row in results:
@@ -113,40 +113,40 @@ def n_featured():
 
 @cache.memoize(timeout=50)
 def get_featured(category, page=1, per_page=5):
-    """Return a list of featured apps with a pagination"""
+    """Return a list of featured projects with a pagination"""
 
     count = n_featured()
 
-    sql = text('''SELECT app.id, app.name, app.short_name, app.info, app.created,
-               app.description,
-               "user".fullname AS owner FROM app, featured, "user"
-               WHERE app.id=featured.project_id AND app.hidden=0
-               AND "user".id=app.owner_id GROUP BY app.id, "user".id
+    sql = text('''SELECT project.id, project.name, project.short_name, project.info, project.created,
+               project.description,
+               "user".fullname AS owner FROM project, featured, "user"
+               WHERE project.id=featured.project_id AND project.hidden=0
+               AND "user".id=project.owner_id GROUP BY project.id, "user".id
                OFFSET(:offset) LIMIT(:limit);
                ''')
     offset = (page - 1) * per_page
     results = db.engine.execute(sql, limit=per_page, offset=offset)
-    apps = []
+    projects = []
     for row in results:
-        app = dict(id=row.id, name=row.name, short_name=row.short_name,
+        project = dict(id=row.id, name=row.name, short_name=row.short_name,
                    created=row.created, description=row.description,
                    overall_progress=overall_progress(row.id),
                    last_activity=last_activity(row.id),
                    owner=row.owner,
                    featured=row.id,
                    info=dict(json.loads(row.info)))
-        apps.append(app)
-    return apps, count
+        projects.append(project)
+    return projects, count
 
-@cache.cached(key_prefix="number_published_apps")
+@cache.cached(key_prefix="number_published_projects")
 def n_published():
-    """Return number of published apps"""
+    """Return number of published projects"""
     sql = text('''
-               WITH published_apps as
-               (SELECT app.id FROM app, task WHERE
-               app.id=task.project_id AND app.hidden=0 AND app.info
-               LIKE('%task_presenter%') GROUP BY app.id)
-               SELECT COUNT(id) FROM published_apps;
+               WITH published_projects as
+               (SELECT project.id FROM project, task WHERE
+               project.id=task.project_id AND project.hidden=0 AND project.info
+               LIKE('%task_presenter%') GROUP BY project.id)
+               SELECT COUNT(id) FROM published_projects;
                ''')
     results = db.engine.execute(sql)
     for row in results:
@@ -155,28 +155,28 @@ def n_published():
 
 @cache.memoize(timeout=50)
 def get_published(category, page=1, per_page=5):
-    """Return a list of apps with a pagination"""
+    """Return a list of projects with a pagination"""
 
     count = n_published()
 
     sql = text('''
-               SELECT app.id, app.name, app.short_name, app.description,
-               app.info, app.created, "user".fullname AS owner,
+               SELECT project.id, project.name, project.short_name, project.description,
+               project.info, project.created, "user".fullname AS owner,
                featured.project_id as featured
-               FROM task, "user", app LEFT OUTER JOIN featured ON app.id=featured.project_id
+               FROM task, "user", project LEFT OUTER JOIN featured ON project.id=featured.project_id
                WHERE
-               app.id=task.project_id AND app.info LIKE('%task_presenter%')
-               AND app.hidden=0
-               AND "user".id=app.owner_id
-               GROUP BY app.id, "user".id, featured.id ORDER BY app.name
+               project.id=task.project_id AND project.info LIKE('%task_presenter%')
+               AND project.hidden=0
+               AND "user".id=project.owner_id
+               GROUP BY project.id, "user".id, featured.id ORDER BY project.name
                OFFSET :offset
                LIMIT :limit;''')
 
     offset = (page - 1) * per_page
     results = db.engine.execute(sql, limit=per_page, offset=offset)
-    apps = []
+    projects = []
     for row in results:
-        app = dict(id=row.id,
+        project = dict(id=row.id,
                    name=row.name, short_name=row.short_name,
                    created=row.created,
                    description=row.description,
@@ -185,17 +185,17 @@ def get_published(category, page=1, per_page=5):
                    last_activity=last_activity(row.id),
                    overall_progress=overall_progress(row.id),
                    info=dict(json.loads(row.info)))
-        apps.append(app)
-    return apps, count
+        projects.append(project)
+    return projects, count
 
-@cache.cached(key_prefix="number_draft_apps")
+@cache.cached(key_prefix="number_draft_projects")
 def n_draft():
     """Return number of draft projects"""
     sql = text('''
-               SELECT count(app.id) FROM app
-               LEFT JOIN task on app.id=task.project_id
-               WHERE task.project_id IS NULL AND app.info NOT LIKE('%task_presenter%')
-               AND app.hidden=0;''')
+               SELECT count(project.id) FROM project
+               LEFT JOIN task on project.id=task.project_id
+               WHERE task.project_id IS NULL AND project.info NOT LIKE('%task_presenter%')
+               AND project.hidden=0;''')
 
     results = db.engine.execute(sql)
     for row in results:
@@ -209,43 +209,43 @@ def get_draft(category, page=1, per_page=5):
     count = n_draft()
 
     sql = text('''
-               SELECT app.id, app.name, app.short_name, app.created,
-               app.description, app.info, "user".fullname as owner
-               FROM "user", app LEFT JOIN task ON app.id=task.project_id
-               WHERE task.project_id IS NULL AND app.info NOT LIKE('%task_presenter%')
-               AND app.hidden=0
-               AND app.owner_id="user".id
+               SELECT project.id, project.name, project.short_name, project.created,
+               project.description, project.info, "user".fullname as owner
+               FROM "user", project LEFT JOIN task ON project.id=task.project_id
+               WHERE task.project_id IS NULL AND project.info NOT LIKE('%task_presenter%')
+               AND project.hidden=0
+               AND project.owner_id="user".id
                OFFSET :offset
                LIMIT :limit;''')
 
     offset = (page - 1) * per_page
     results = db.engine.execute(sql, limit=per_page, offset=offset)
-    apps = []
+    projects = []
     for row in results:
-        app = dict(id=row.id, name=row.name, short_name=row.short_name,
+        project = dict(id=row.id, name=row.name, short_name=row.short_name,
                    created=row.created,
                    description=row.description,
                    owner=row.owner,
                    last_activity=last_activity(row.id),
                    overall_progress=overall_progress(row.id),
                    info=dict(json.loads(row.info)))
-        apps.append(app)
-    return apps, count
+        projects.append(project)
+    return projects, count
 
 
 @cache.memoize(timeout=50)
 def n_count(category):
-    """Count the number of apps in a given category"""
+    """Count the number of projects in a given category"""
     sql = text('''
                WITH uniq AS (
-               SELECT COUNT(app.id) FROM task, app
-               LEFT OUTER JOIN category ON app.category_id=category.id
+               SELECT COUNT(project.id) FROM task, project
+               LEFT OUTER JOIN category ON project.category_id=category.id
                WHERE
                category.short_name=:category
-               AND app.hidden=0
-               AND app.info LIKE('%task_presenter%')
-               AND task.project_id=app.id
-               GROUP BY app.id)
+               AND project.hidden=0
+               AND project.info LIKE('%task_presenter%')
+               AND task.project_id=project.id
+               GROUP BY project.id)
                SELECT COUNT(*) FROM uniq
                ''')
 
@@ -258,33 +258,33 @@ def n_count(category):
 
 @cache.memoize(timeout=50)
 def get(category, page=1, per_page=5):
-    """Return a list of apps with at least one task and a task_presenter
+    """Return a list of projects with at least one task and a task_presenter
        with a pagination for a given category"""
 
     count = n_count(category)
 
     sql = text('''
-               SELECT app.id, app.name, app.short_name, app.description,
-               app.info, app.created, app.category_id, "user".fullname AS owner,
+               SELECT project.id, project.name, project.short_name, project.description,
+               project.info, project.created, project.category_id, "user".fullname AS owner,
                featured.project_id as featured
-               FROM "user", task, app
-               LEFT OUTER JOIN category ON app.category_id=category.id
-               LEFT OUTER JOIN featured ON app.id=featured.project_id
+               FROM "user", task, project
+               LEFT OUTER JOIN category ON project.category_id=category.id
+               LEFT OUTER JOIN featured ON project.id=featured.project_id
                WHERE
                category.short_name=:category
-               AND app.hidden=0
-               AND "user".id=app.owner_id
-               AND app.info LIKE('%task_presenter%')
-               AND task.project_id=app.id
-               GROUP BY app.id, "user".id, featured.project_id ORDER BY app.name
+               AND project.hidden=0
+               AND "user".id=project.owner_id
+               AND project.info LIKE('%task_presenter%')
+               AND task.project_id=project.id
+               GROUP BY project.id, "user".id, featured.project_id ORDER BY project.name
                OFFSET :offset
                LIMIT :limit;''')
 
     offset = (page - 1) * per_page
     results = db.engine.execute(sql, category=category, limit=per_page, offset=offset)
-    apps = []
+    projects = []
     for row in results:
-        app = dict(id=row.id,
+        project = dict(id=row.id,
                    name=row.name, short_name=row.short_name,
                    created=row.created,
                    description=row.description,
@@ -293,17 +293,17 @@ def get(category, page=1, per_page=5):
                    last_activity=last_activity(row.id),
                    overall_progress=overall_progress(row.id),
                    info=dict(json.loads(row.info)))
-        apps.append(app)
-    return apps, count
+        projects.append(project)
+    return projects, count
 
 
 def reset():
     """Clean the cache"""
-    cache.delete('front_page_featured_apps')
-    cache.delete('front_page_top_apps')
-    cache.delete('number_featured_apps')
-    cache.delete('number_published_apps')
-    cache.delete('number_draft_apps')
+    cache.delete('front_page_featured_projects')
+    cache.delete('front_page_top_projects')
+    cache.delete('number_featured_projects')
+    cache.delete('number_published_projects')
+    cache.delete('number_draft_projects')
     cache.delete_memoized(get_published)
     cache.delete_memoized(get_featured)
     cache.delete_memoized(get_draft)

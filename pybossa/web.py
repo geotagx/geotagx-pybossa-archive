@@ -36,7 +36,7 @@ from pybossa.view.admin import blueprint as admin
 from pybossa.view.leaderboard import blueprint as leaderboard
 from pybossa.view.stats import blueprint as stats
 from pybossa.view.help import blueprint as help
-from pybossa.cache import apps as cached_apps
+from pybossa.cache import projects as cached_projects
 from pybossa.cache import users as cached_users
 
 
@@ -146,7 +146,7 @@ def global_template_context():
             for key in announcement.keys():
                 if key == 'admin' and current_user.admin:
                     flash(announcement[key], 'info')
-                if key == 'owner' and len(current_user.apps) != 0:
+                if key == 'owner' and len(current_user.projects) != 0:
                     flash(announcement[key], 'info')
                 if key == 'user':
                     flash(announcement[key], 'info')
@@ -187,9 +187,9 @@ def api_authentication():
 
 @app.route('/')
 def home():
-    """ Render home page with the cached apps and users"""
-    d = {'featured': cached_apps.get_featured_front_page(),
-         'top_apps': cached_apps.get_top(),
+    """ Render home page with the cached projects and users"""
+    d = {'featured': cached_projects.get_featured_front_page(),
+         'top_projects': cached_projects.get_top(),
          'top_users': None}
 
     if app.config['ENFORCE_PRIVACY'] and current_user.is_authenticated():
