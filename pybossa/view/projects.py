@@ -670,7 +670,7 @@ def export(short_name, task_id):
         .first()
 
     results = [tr.dictize() for tr in task.task_runs]
-    return Response(json.dumps(results), mimetype='project/json')
+    return Response(json.dumps(results), mimetype='application/json')
 
 
 @blueprint.route('/<short_name>/tasks/')
@@ -804,7 +804,7 @@ def export_to(short_name):
             table = tables[ty]
         except KeyError:
             return abort(404)
-        return Response(gen_json(table), mimetype='project/json')
+        return Response(gen_json(table), mimetype='application/json')
 
     def create_ckan_datastores(ckan):
         tables = {"task": model.Task, "task_run": model.TaskRun}
