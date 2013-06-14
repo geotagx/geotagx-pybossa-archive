@@ -103,7 +103,7 @@ def project_title(project, page_name):
 
 
 def project_by_shortname(short_name):
-    return App.query.filter_by(short_name=short_name).first_or_404()
+    return Project.query.filter_by(short_name=short_name).first_or_404()
 
 
 @blueprint.route('/', defaults={'page': 1})
@@ -389,7 +389,7 @@ def update(short_name):
 
     title = project_title(project, "Update")
     if request.method == 'GET':
-        form = AppForm(obj=project)
+        form = ProjectForm(obj=project)
         categories = db.session.query(model.Category).all()
         form.category_id.choices = [(c.id, c.name) for c in categories]
         if project.category_id is None:
@@ -404,7 +404,7 @@ def update(short_name):
         #            break
 
     if request.method == 'POST':
-        form = AppForm(request.form)
+        form = ProjectForm(request.form)
         categories = cached_cat.get_all()
         form.category_id.choices = [(c.id, c.name) for c in categories]
         if form.validate():
@@ -923,7 +923,7 @@ def export_to(short_name):
 
 @blueprint.route('/<short_name>/stats')
 def show_stats(short_name):
-    """Returns App Stats"""
+    """Returns Project Stats"""
     project = project_by_shortname(short_name)
     title = project_title(project, "Statistics")
 
