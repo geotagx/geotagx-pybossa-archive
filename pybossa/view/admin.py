@@ -30,7 +30,7 @@ from werkzeug.exceptions import HTTPException
 import pybossa.model as model
 from pybossa.core import db
 from pybossa.util import admin_required
-from pybossa.cache import apps as cached_apps
+from pybossa.cache import projects as cached_projects
 from pybossa.cache import categories as cached_cat
 from pybossa.auth import require
 import pybossa.validator as pb_validator
@@ -68,18 +68,18 @@ def featured(app_id=None):
         if request.method == 'GET':
             apps = {}
             for c in categories:
-                n_apps = cached_apps.n_count(category=c.short_name)
-                apps[c.short_name], n_apps = cached_apps.get(category=c.short_name,
+                n_apps = cached_projects.n_count(category=c.short_name)
+                apps[c.short_name], n_apps = cached_projects.get(category=c.short_name,
                                                              page=1,
                                                              per_page=n_apps)
             return render_template('/admin/applications.html', apps=apps,
                                    categories=categories)
         elif app_id:
             if request.method == 'POST':
-                cached_apps.reset()
+                cached_projects.reset()
                 f = model.Featured()
                 f.app_id = app_id
-                app = db.session.query(model.App).get(app_id)
+                app = db.session.query(model.Project).get(app_id)
                 require.app.update(app)
                 # Check if the app is already in this table
                 tmp = db.session.query(model.Featured)\
@@ -93,7 +93,7 @@ def featured(app_id=None):
                     msg = "App.id %s alreay in Featured table" % app_id
                     return format_error(msg, 415)
             if request.method == 'DELETE':
-                cached_apps.reset()
+                cached_projects.reset()
                 f = db.session.query(model.Featured)\
                       .filter(model.Featured.app_id == app_id)\
                       .first()
@@ -243,7 +243,7 @@ def categories():
         categories = cached_cat.get_all()
         n_apps_per_category = dict()
         for c in categories:
-            n_apps_per_category[c.short_name] = cached_apps.n_count(c.short_name)
+            n_apps_per_category[c.short_name] = cached_projects.n_count(c.short_name)
 
         return render_template('admin/categories.html',
                                title=lazy_gettext('Categories'),
