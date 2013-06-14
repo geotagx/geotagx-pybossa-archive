@@ -49,13 +49,13 @@ class ProjectForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
-                      pb_validator.Unique(db.session, model.App, model.App.name,
+                      pb_validator.Unique(db.session, model.Project, model.Project.name,
                                           message="Name is already taken.")])
     short_name = TextField(lazy_gettext('Short Name'),
                            [validators.Required(),
                             pb_validator.NotAllowedChars(),
                             pb_validator.Unique(
-                                db.session, model.App, model.App.short_name,
+                                db.session, model.Project, model.Project.short_name,
                                 message=lazy_gettext(
                                     "Short Name is already taken."))])
     description = TextField(lazy_gettext('Description'),
@@ -234,7 +234,7 @@ def new():
     if form.thumbnail.data:
         info['thumbnail'] = form.thumbnail.data
 
-    project = model.App(name=form.name.data,
+    project = model.Project(name=form.name.data,
                     short_name=form.short_name.data,
                     description=form.description.data,
                     long_description=form.long_description.data,
@@ -363,7 +363,7 @@ def update(short_name):
         # Merge info object
         info = dict(project.info.items() + new_info.items())
 
-        new_project = model.App(
+        new_project = model.Project(
             id=form.id.data,
             name=form.name.data,
             short_name=form.short_name.data,
