@@ -31,7 +31,7 @@ from pybossa.core import app, login_manager, db, cache, babel
 import pybossa.model as model
 from pybossa.api import blueprint as api
 from pybossa.view.account import blueprint as account
-from pybossa.view.applications import blueprint as applications
+from pybossa.view.projects import blueprint as projects
 from pybossa.view.admin import blueprint as admin
 from pybossa.view.leaderboard import blueprint as leaderboard
 from pybossa.view.stats import blueprint as stats
@@ -45,7 +45,7 @@ logger = logging.getLogger('pybossa')
 # other views ...
 app.register_blueprint(api, url_prefix='/api')
 app.register_blueprint(account, url_prefix='/account')
-app.register_blueprint(applications, url_prefix='/app')
+app.register_blueprint(projects, url_prefix='/project')
 app.register_blueprint(admin, url_prefix='/admin')
 app.register_blueprint(leaderboard, url_prefix='/leaderboard')
 app.register_blueprint(stats, url_prefix='/stats')

@@ -31,7 +31,7 @@ from pybossa.core import db
 from pybossa.model import App, Task
 from pybossa.util import Pagination, UnicodeWriter, admin_required
 from pybossa.auth import require
-from pybossa.cache import apps as cached_apps
+from pybossa.cache import projects as cached_projects
 from pybossa.cache import categories as cached_cat
 from pybossa.ckan import Ckan
 
@@ -42,10 +42,10 @@ import operator
 import math
 import requests
 
-blueprint = Blueprint('app', __name__)
+blueprint = Blueprint('project', __name__)
 
 
-class AppForm(Form):
+class ProjectForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
     name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
@@ -94,15 +94,15 @@ class TaskSchedulerForm(Form):
                                  ('random', lazy_gettext('Random'))],)
 
 
-def app_title(app, page_name):
-    if not app:
-        return "Application not found"
+def project_title(project, page_name):
+    if not project:
+        return "Project not found"
     if page_name is None:
-        return "Application: %s" % (app.name)
-    return "Application: %s &middot; %s" % (app.name, page_name)
+        return "Project: %s" % (project.name)
+    return "Project: %s &middot; %s" % (project.name, page_name)
 
 
-def app_by_shortname(short_name):
+def project_by_shortname(short_name):
     return App.query.filter_by(short_name=short_name).first_or_404()
 
 
@@ -118,7 +118,7 @@ def redirect_old_featured(page):
 def redirect_old_published(page):
     """DEPRECATED only to redirect old links"""
     category = db.session.query(model.Category).first()
-    return redirect(url_for('.app_cat_index', category=category.short_name, page=page), 301)
+    return redirect(url_for('.project_cat_index', category=category.short_name, page=page), 301)
 
 
 @blueprint.route('/draft/', defaults={'page': 1})
@@ -131,9 +131,9 @@ def redirect_old_draft(page):
 @blueprint.route('/category/featured/', defaults={'page': 1})
 @blueprint.route('/category/featured/page/<int:page>/')
 def index(page):
-    """List apps in the system"""
-    if cached_apps.n_featured() > 0:
-        return app_index(page, cached_apps.get_featured, 'featured',
+    """List projects in the system"""
+    if cached_projects.n_featured() > 0:
+        return project_index(page, cached_projects.get_featured, 'featured',
                          True, False)
     else:
         categories = cached_cat.get_all()
@@ -145,19 +145,19 @@ def index(page):
                 cat_short_name = cat.short_name
             else:
                 cat_short_name = "algo"
-        return redirect(url_for('.app_cat_index', category=cat_short_name))
+        return redirect(url_for('.project_cat_index', category=cat_short_name))
 
 
-def app_index(page, lookup, category, fallback, use_count):
-    """Show apps of app_type"""
-    if not require.app.read():
+def project_index(page, lookup, category, fallback, use_count):
+    """Show projects of project_type"""
+    if not require.project.read():
         abort(403)
 
     per_page = 5
 
-    apps, count = lookup(category, page, per_page)
+    projects, count = lookup(category, page, per_page)
 
-    if fallback and not apps:
+    if fallback and not projects:
         return redirect(url_for('.published'))
 
     pagination = Pagination(page, per_page, count)
@@ -165,30 +165,30 @@ def app_index(page, lookup, category, fallback, use_count):
     # Check for pre-defined categories featured and draft
     featured_cat = model.Category(name='Featured',
                                   short_name='featured',
-                                  description='Featured applications')
+                                  description='Featured projects')
     if category == 'featured':
         active_cat = featured_cat
     elif category == 'draft':
         active_cat = model.Category(name='Draft',
                                     short_name='draft',
-                                    description='Draft applications')
+                                    description='Draft projects')
     else:
         active_cat = db.session.query(model.Category)\
                        .filter_by(short_name=category).first()
 
     # Check if we have to add the section Featured to local nav
-    if cached_apps.n_featured() > 0:
+    if cached_projects.n_featured() > 0:
         categories.insert(0, featured_cat)
     template_args = {
-        "apps": apps,
-        "title": lazy_gettext("Applications"),
+        "projects": projects,
+        "title": lazy_gettext("Projects"),
         "pagination": pagination,
         "active_cat": active_cat,
         "categories": categories}
 
     if use_count:
         template_args.update({"count": count})
-    return render_template('/applications/index.html', **template_args)
+    return render_template('/projects/index.html', **template_args)
 
 
 @blueprint.route('/category/draft/', defaults={'page': 1})
@@ -196,30 +196,30 @@ def app_index(page, lookup, category, fallback, use_count):
 @login_required
 @admin_required
 def draft(page):
-    """Show the Draft apps"""
-    return app_index(page, cached_apps.get_draft, 'draft',
+    """Show the Draft projects"""
+    return project_index(page, cached_projects.get_draft, 'draft',
                      False, True)
 
 
 @blueprint.route('/category/<string:category>/', defaults={'page': 1})
 @blueprint.route('/category/<string:category>/page/<int:page>/')
-def app_cat_index(category, page):
-    """Show Apps that belong to a given category"""
-    return app_index(page, cached_apps.get, category, False, True)
+def project_cat_index(category, page):
+    """Show Projects that belong to a given category"""
+    return project_index(page, cached_projects.get, category, False, True)
 
 
 @blueprint.route('/new', methods=['GET', 'POST'])
 @login_required
 def new():
-    if not require.app.create():
+    if not require.project.create():
         abort(403)
-    form = AppForm(request.form)
+    form = ProjectForm(request.form)
     categories = db.session.query(model.Category).all()
     form.category_id.choices = [(c.id, c.name) for c in categories]
 
     def respond(errors):
-        return render_template('applications/new.html',
-                               title=lazy_gettext("Create an Application"),
+        return render_template('projects/new.html',
+                               title=lazy_gettext("Create an Project"),
                                form=form, errors=errors)
 
     if request.method != 'POST':
@@ -234,7 +234,7 @@ def new():
     if form.thumbnail.data:
         info['thumbnail'] = form.thumbnail.data
 
-    app = model.App(name=form.name.data,
+    project = model.App(name=form.name.data,
                     short_name=form.short_name.data,
                     description=form.description.data,
                     long_description=form.long_description.data,
@@ -244,11 +244,11 @@ def new():
                     owner_id=current_user.id,
                     info=info,)
 
-    cached_apps.reset()
-    db.session.add(app)
+    cached_projects.reset()
+    db.session.add(project)
     db.session.commit()
     # Clean cache
-    msg_1 = lazy_gettext('Application created!')
+    msg_1 = lazy_gettext('Project created!')
     flash('<i class="icon-ok"></i> ' + msg_1, 'success')
     flash('<i class="icon-bullhorn"></i> ' +
           lazy_gettext('You can check the ') +
@@ -257,27 +257,27 @@ def new():
           '</a></strong> ' +
           lazy_gettext('for adding tasks, a thumbnail, using PyBossa.JS, etc.'),
           'info')
-    return redirect(url_for('.settings', short_name=app.short_name))
+    return redirect(url_for('.settings', short_name=project.short_name))
 
 
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
 def task_presenter_editor(short_name):
     errors = False
-    app = app_by_shortname(short_name)
+    project = project_by_shortname(short_name)
 
-    title = app_title(app, "Task Presenter Editor")
-    if not require.app.update(app):
+    title = project_title(project, "Task Presenter Editor")
+    if not require.project.update(project):
         abort(403)
 
     form = TaskPresenterForm(request.form)
     if request.method == 'POST' and form.validate():
-        app.info['task_presenter'] = form.editor.data
-        db.session.add(app)
+        project.info['task_presenter'] = form.editor.data
+        db.session.add(project)
         db.session.commit()
         msg_1 = lazy_gettext('Task presenter added!')
         flash('<i class="icon-ok"></i> ' + msg_1, 'success')
-        return redirect(url_for('.tasks', short_name=app.short_name))
+        return redirect(url_for('.tasks', short_name=project.short_name))
 
     if request.method == 'POST' and not form.validate():
         flash(lazy_gettext('Please correct the errors'), 'error')
@@ -286,84 +286,84 @@ def task_presenter_editor(short_name):
     if request.method != 'GET':
         return
 
-    if app.info.get('task_presenter'):
-        form.editor.data = app.info['task_presenter']
+    if project.info.get('task_presenter'):
+        form.editor.data = project.info['task_presenter']
     else:
         if not request.args.get('template'):
             msg_1 = lazy_gettext('<strong>Note</strong> You will need to upload the'
                                  ' tasks using the')
             msg_2 = lazy_gettext('CSV importer')
-            msg_3 = lazy_gettext(' or download the app bundle and run the'
+            msg_3 = lazy_gettext(' or download the project bundle and run the'
                                  ' <strong>createTasks.py</strong> script in your'
                                  ' computer')
-            url = '<a href="%s"> %s</a>' % (url_for('app.import_task',
-                                                    short_name=app.short_name), msg_2)
+            url = '<a href="%s"> %s</a>' % (url_for('project.import_task',
+                                                    short_name=project.short_name), msg_2)
             msg = msg_1 + url + msg_3
             flash(msg, 'info')
 
-            wrap = lambda i: "applications/presenters/%s.html" % i
+            wrap = lambda i: "projects/presenters/%s.html" % i
             pres_tmpls = map(wrap, presenter_module.presenters)
 
             return render_template(
-                'applications/task_presenter_options.html',
+                'projects/task_presenter_options.html',
                 title=title,
-                app=app,
+                project=project,
                 presenters=pres_tmpls)
 
-        tmpl_uri = "applications/snippets/%s.html" \
+        tmpl_uri = "projects/snippets/%s.html" \
             % request.args.get('template')
-        tmpl = render_template(tmpl_uri, app=app)
+        tmpl = render_template(tmpl_uri, project=project)
         form.editor.data = tmpl
         msg = 'Your code will be <em>automagically</em> rendered in \
                       the <strong>preview section</strong>. Click in the \
                       preview button!'
         flash(lazy_gettext(msg), 'info')
-    return render_template('applications/task_presenter_editor.html',
+    return render_template('projects/task_presenter_editor.html',
                            title=title,
                            form=form,
-                           app=app,
+                           project=project,
                            errors=errors)
 
 
 @blueprint.route('/<short_name>/delete', methods=['GET', 'POST'])
 @login_required
 def delete(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Delete")
-    if not require.app.delete(app):
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Delete")
+    if not require.project.delete(project):
         abort(403)
     if request.method == 'GET':
-        return render_template('/applications/delete.html',
+        return render_template('/projects/delete.html',
                                title=title,
-                               app=app)
+                               project=project)
     # Clean cache
-    cached_apps.clean(app.id)
-    db.session.delete(app)
+    cached_projects.clean(project.id)
+    db.session.delete(project)
     db.session.commit()
-    flash(lazy_gettext('Application deleted!'), 'success')
+    flash(lazy_gettext('Project deleted!'), 'success')
     return redirect(url_for('account.profile'))
 
 
 @blueprint.route('/<short_name>/update', methods=['GET', 'POST'])
 @login_required
 def update(short_name):
-    app = app_by_shortname(short_name)
+    project = project_by_shortname(short_name)
 
     def handle_valid_form(form):
         hidden = int(form.hidden.data)
 
         new_info = {}
         # Add the info items
-        app = app_by_shortname(short_name)
+        project = project_by_shortname(short_name)
         if form.thumbnail.data:
             new_info['thumbnail'] = form.thumbnail.data
         #if form.sched.data:
         #    new_info['sched'] = form.sched.data
 
         # Merge info object
-        info = dict(app.info.items() + new_info.items())
+        info = dict(project.info.items() + new_info.items())
 
-        new_application = model.App(
+        new_project = model.App(
             id=form.id.data,
             name=form.name.data,
             short_name=form.short_name.data,
@@ -371,35 +371,35 @@ def update(short_name):
             long_description=form.long_description.data,
             hidden=hidden,
             info=info,
-            owner_id=app.owner_id,
+            owner_id=project.owner_id,
             allow_anonymous_contributors=form.allow_anonymous_contributors.data,
             category_id=form.category_id.data)
 
-        app = app_by_shortname(short_name)
-        db.session.merge(new_application)
+        project = project_by_shortname(short_name)
+        db.session.merge(new_project)
         db.session.commit()
-        cached_apps.reset()
+        cached_projects.reset()
         cached_cat.reset()
-        flash(lazy_gettext('Application updated!'), 'success')
+        flash(lazy_gettext('Project updated!'), 'success')
         return redirect(url_for('.details',
-                                short_name=new_application.short_name))
+                                short_name=new_project.short_name))
 
-    if not require.app.update(app):
+    if not require.project.update(project):
         abort(403)
 
-    title = app_title(app, "Update")
+    title = project_title(project, "Update")
     if request.method == 'GET':
-        form = AppForm(obj=app)
+        form = AppForm(obj=project)
         categories = db.session.query(model.Category).all()
         form.category_id.choices = [(c.id, c.name) for c in categories]
-        if app.category_id is None:
-            app.category_id = categories[0].id
-        form.populate_obj(app)
-        if app.info.get('thumbnail'):
-            form.thumbnail.data = app.info['thumbnail']
-        #if app.info.get('sched'):
+        if project.category_id is None:
+            project.category_id = categories[0].id
+        form.populate_obj(project)
+        if project.info.get('thumbnail'):
+            form.thumbnail.data = project.info['thumbnail']
+        #if project.info.get('sched'):
         #    for s in form.sched.choices:
-        #        if app.info['sched'] == s[0]:
+        #        if project.info['sched'] == s[0]:
         #            form.sched.data = s[0]
         #            break
 
@@ -411,27 +411,27 @@ def update(short_name):
             return handle_valid_form(form)
         flash(lazy_gettext('Please correct the errors'), 'error')
 
-    return render_template('/applications/update.html',
+    return render_template('/projects/update.html',
                            form=form,
                            title=title,
-                           app=app)
+                           project=project)
 
 
 @blueprint.route('/<short_name>/')
 def details(short_name):
-    app = app_by_shortname(short_name)
+    project = project_by_shortname(short_name)
 
     try:
-        require.app.read(app)
-        require.app.update(app)
-        template = '/applications/actions.html'
+        require.project.read(project)
+        require.project.update(project)
+        template = '/projects/actions.html'
     except HTTPException:
-        if app.hidden:
-            app = None
-        template = '/applications/app.html'
+        if project.hidden:
+            project = None
+        template = '/projects/project.html'
 
-    title = app_title(app, None)
-    template_args = {"app": app, "title": title}
+    title = project_title(project, None)
+    template_args = {"project": project, "title": title}
     try:
         if current_app.config.get('CKAN_URL'):
             template_args['ckan_name'] = current_app.config.get('CKAN_NAME')
@@ -454,15 +454,15 @@ def details(short_name):
 @blueprint.route('/<short_name>/settings')
 @login_required
 def settings(short_name):
-    app = app_by_shortname(short_name)
+    project = project_by_shortname(short_name)
 
-    title = app_title(app, "Settings")
+    title = project_title(project, "Settings")
     try:
-        require.app.read(app)
-        require.app.update(app)
+        require.project.read(project)
+        require.project.update(project)
 
-        return render_template('/applications/settings.html',
-                               app=app,
+        return render_template('/projects/settings.html',
+                               project=project,
                                title=title)
     except HTTPException:
         return abort(403)
@@ -478,7 +478,7 @@ def compute_importer_variant_pairs(forms):
     if len(variants) % 2:
         variants.append("empty")
 
-    prefix = "applications/tasks/"
+    prefix = "projects/tasks/"
 
     importer_variants = map(lambda i: "%s%s.html" % (prefix, i), variants)
     return [
@@ -489,11 +489,11 @@ def compute_importer_variant_pairs(forms):
 @blueprint.route('/<short_name>/tasks/import', methods=['GET', 'POST'])
 @login_required
 def import_task(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Import Tasks")
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Import Tasks")
     loading_text = lazy_gettext("Importing tasks, this may take a while, wait...")
-    template_args = {"title": title, "app": app, "loading_text": loading_text}
-    if not require.app.update(app):
+    template_args = {"title": title, "project": project, "loading_text": loading_text}
+    if not require.project.update(project):
         return abort(403)
     data_handlers = dict([
         (i.template_id, (i.form_detector, i(request.form), i.form_id))
@@ -509,7 +509,7 @@ def import_task(short_name):
     template = request.args.get('template')
 
     if not (template or request.method == 'POST'):
-        return render_template('/applications/import_options.html',
+        return render_template('/projects/import_options.html',
                                **template_args)
 
     if template == 'gdocs':
@@ -530,20 +530,20 @@ def import_task(short_name):
             break
 
     def render_forms():
-        tmpl = '/applications/importers/%s.html' % template
+        tmpl = '/projects/importers/%s.html' % template
         return render_template(tmpl, **template_args)
 
     if not (form and form.validate_on_submit()):
         return render_forms()
 
-    return _import_task(app, handler, form, render_forms)
+    return _import_task(project, handler, form, render_forms)
 
 
-def _import_task(app, handler, form, render_forms):
+def _import_task(project, handler, form, render_forms):
     try:
         empty = True
         for task_data in handler.tasks(form):
-            task = model.Task(app=app)
+            task = model.Task(project=project)
             print task_data
             [setattr(task, k, v) for k, v in task_data.iteritems()]
             db.session.add(task)
@@ -553,7 +553,7 @@ def _import_task(app, handler, form, render_forms):
             raise importer.BulkImportException(
                 lazy_gettext('Oops! It looks like the file is empty.'))
         flash(lazy_gettext('Tasks imported successfully!'), 'success')
-        return redirect(url_for('.tasks', short_name=app.short_name))
+        return redirect(url_for('.tasks', short_name=project.short_name))
     except importer.BulkImportException, err_msg:
         flash(err_msg, 'error')
     except Exception as inst:
@@ -565,25 +565,25 @@ def _import_task(app, handler, form, render_forms):
 
 @blueprint.route('/<short_name>/task/<int:task_id>')
 def task_presenter(short_name, task_id):
-    app = app_by_shortname(short_name)
+    project = project_by_shortname(short_name)
     task = Task.query.filter_by(id=task_id).first_or_404()
 
     if current_user.is_anonymous():
-        if not app.allow_anonymous_contributors:
+        if not project.allow_anonymous_contributors:
             msg = ("Oops! You have to sign in to participate in "
                    "<strong>%s</strong>"
-                   "application" % app.name)
+                   "project" % project.name)
             flash(lazy_gettext(msg), 'warning')
             return redirect(url_for('account.signin',
                                     next=url_for('.presenter',
-                                                 short_name=app.short_name)))
+                                                 short_name=project.short_name)))
         else:
             msg_1 = lazy_gettext(
                 "Ooops! You are an anonymous user and will not "
                 "get any credit"
                 " for your contributions.")
             next_url = url_for(
-                'app.task_presenter',
+                'project.task_presenter',
                 short_name=short_name,
                 task_id=task_id)
             url = url_for(
@@ -591,21 +591,21 @@ def task_presenter(short_name, task_id):
                 next=next_url)
             flash(msg_1 + "<a href=\"" + url + "\">Sign in now!</a>", "warning")
 
-    title = app_title(app, "Contribute")
-    template_args = {"app": app, "title": title}
+    title = project_title(project, "Contribute")
+    template_args = {"project": project, "title": title}
 
     def respond(tmpl):
         return render_template(tmpl, **template_args)
 
-    if not (task.app_id == app.id):
-        return respond('/applications/task/wrong.html')
+    if not (task.project_id == project.id):
+        return respond('/projects/task/wrong.html')
 
-    #return render_template('/applications/presenter.html', app = app)
+    #return render_template('/projects/presenter.html', project = project)
     # Check if the user has submitted a task before
 
     tr_search = db.session.query(model.TaskRun)\
                   .filter(model.TaskRun.task_id == task_id)\
-                  .filter(model.TaskRun.app_id == app.id)
+                  .filter(model.TaskRun.project_id == project.id)
 
     if current_user.is_anonymous():
         remote_addr = request.remote_addr or "127.0.0.1"
@@ -615,24 +615,24 @@ def task_presenter(short_name, task_id):
 
     tr_first = tr.first()
     if tr_first is None:
-        return respond('/applications/presenter.html')
+        return respond('/projects/presenter.html')
     else:
-        return respond('/applications/task/done.html')
+        return respond('/projects/task/done.html')
 
 
 @blueprint.route('/<short_name>/presenter')
 @blueprint.route('/<short_name>/newtask')
 def presenter(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Contribute")
-    template_args = {"app": app, "title": title}
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Contribute")
+    template_args = {"project": project, "title": title}
 
-    if not app.allow_anonymous_contributors and current_user.is_anonymous():
+    if not project.allow_anonymous_contributors and current_user.is_anonymous():
         msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
-               application" % app.name
+               project" % project.name
         flash(lazy_gettext(msg), 'warning')
         return redirect(url_for('account.signin',
-                        next=url_for('.presenter', short_name=app.short_name)))
+                        next=url_for('.presenter', short_name=project.short_name)))
 
     msg = "Ooops! You are an anonymous user and will not \
            get any credit for your contributions. Sign in \
@@ -645,113 +645,113 @@ def presenter(short_name):
         resp = make_response(render_template(tmpl, **template_args))
         return resp
 
-    if app.info.get("tutorial") and \
-            request.cookies.get(app.short_name + "tutorial") is None:
-        resp = respond('/applications/tutorial.html')
-        resp.set_cookie(app.short_name + 'tutorial', 'seen')
+    if project.info.get("tutorial") and \
+            request.cookies.get(project.short_name + "tutorial") is None:
+        resp = respond('/projects/tutorial.html')
+        resp.set_cookie(project.short_name + 'tutorial', 'seen')
         return resp
     else:
-        return respond('/applications/presenter.html')
+        return respond('/projects/presenter.html')
 
 
 @blueprint.route('/<short_name>/tutorial')
 def tutorial(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Tutorial")
-    return render_template('/applications/tutorial.html', title=title, app=app)
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Tutorial")
+    return render_template('/projects/tutorial.html', title=title, project=project)
 
 
 @blueprint.route('/<short_name>/<int:task_id>/results.json')
 def export(short_name, task_id):
     """Return a file with all the TaskRuns for a give Task"""
-    app_by_shortname(short_name)
+    project_by_shortname(short_name)
     task = db.session.query(model.Task)\
         .filter(model.Task.id == task_id)\
         .first()
 
     results = [tr.dictize() for tr in task.task_runs]
-    return Response(json.dumps(results), mimetype='application/json')
+    return Response(json.dumps(results), mimetype='project/json')
 
 
 @blueprint.route('/<short_name>/tasks/')
 def tasks(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Tasks")
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Tasks")
     try:
-        require.app.read(app)
-        return render_template('/applications/tasks.html',
+        require.project.read(project)
+        return render_template('/projects/tasks.html',
                                title=title,
-                               app=app)
+                               project=project)
     except HTTPException:
-        if not app.hidden:
-            return render_template('/applications/tasks.html',
-                                   title="Application not found",
-                                   app=None)
-        return render_template('/applications/tasks.html',
-                               title="Application not found",
-                               app=None)
+        if not project.hidden:
+            return render_template('/projects/tasks.html',
+                                   title="Project not found",
+                                   project=None)
+        return render_template('/projects/tasks.html',
+                               title="Project not found",
+                               project=None)
 
 
 @blueprint.route('/<short_name>/tasks/browse', defaults={'page': 1})
 @blueprint.route('/<short_name>/tasks/browse/<int:page>')
 def tasks_browse(short_name, page):
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Tasks")
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Tasks")
 
     def respond():
         per_page = 10
         count = db.session.query(model.Task)\
-            .filter_by(app_id=app.id)\
+            .filter_by(project_id=project.id)\
             .count()
-        app_tasks = db.session.query(model.Task)\
-            .filter_by(app_id=app.id)\
+        project_tasks = db.session.query(model.Task)\
+            .filter_by(project_id=project.id)\
             .order_by(model.Task.id)\
             .limit(per_page)\
             .offset((page - 1) * per_page)\
             .all()
 
-        if not app_tasks and page != 1:
+        if not project_tasks and page != 1:
             abort(404)
 
         pagination = Pagination(page, per_page, count)
-        return render_template('/applications/tasks_browse.html',
-                               app=app,
-                               tasks=app_tasks,
+        return render_template('/projects/tasks_browse.html',
+                               project=project,
+                               tasks=project_tasks,
                                title=title,
                                pagination=pagination)
 
     try:
-        require.app.read(app)
-        require.app.update(app)
+        require.project.read(project)
+        require.project.update(project)
         return respond()
     except HTTPException:
-        if not app.hidden:
+        if not project.hidden:
             return respond()
-        return render_template('/applications/tasks.html',
-                               title="Application not found",
-                               app=None)
+        return render_template('/projects/tasks.html',
+                               title="Project not found",
+                               project=None)
 
 
 @blueprint.route('/<short_name>/tasks/delete', methods=['GET', 'POST'])
 @login_required
 def delete_tasks(short_name):
-    """Delete ALL the tasks for a given application"""
-    app = app_by_shortname(short_name)
+    """Delete ALL the tasks for a given project"""
+    project = project_by_shortname(short_name)
     try:
-        require.app.read(app)
-        require.app.update(app)
+        require.project.read(project)
+        require.project.update(project)
         if request.method == 'GET':
-            title = app_title(app, "Delete")
-            return render_template('applications/tasks/delete.html',
-                                   app=app,
+            title = project_title(project, "Delete")
+            return render_template('projects/tasks/delete.html',
+                                   project=project,
                                    title=title)
         else:
-            for task in app.tasks:
+            for task in project.tasks:
                 db.session.delete(task)
             db.session.commit()
             msg = "All the tasks and associated task runs have been deleted"
             flash(lazy_gettext(msg), 'success')
-            return redirect(url_for('.tasks', short_name=app.short_name))
+            return redirect(url_for('.tasks', short_name=project.short_name))
     except HTTPException:
         return abort(403)
 
@@ -759,23 +759,23 @@ def delete_tasks(short_name):
 @blueprint.route('/<short_name>/tasks/export')
 def export_to(short_name):
     """Export Tasks and TaskRuns in the given format"""
-    app = app_by_shortname(short_name)
-    title = app_title(app, lazy_gettext("Export"))
+    project = project_by_shortname(short_name)
+    title = project_title(project, lazy_gettext("Export"))
     loading_text = lazy_gettext("Exporting data..., this may take a while")
 
     def respond():
-        return render_template('/applications/export.html',
+        return render_template('/projects/export.html',
                                title=title,
                                loading_text=loading_text,
-                               app=app)
+                               project=project)
 
     def gen_json(table):
         n = db.session.query(table)\
-            .filter_by(app_id=app.id).count()
+            .filter_by(project_id=project.id).count()
         sep = ", "
         yield "["
         for i, tr in enumerate(db.session.query(table)
-                                 .filter_by(app_id=app.id).yield_per(1), 1):
+                                 .filter_by(project_id=project.id).yield_per(1), 1):
             item = json.dumps(tr.dictize())
             if (i == n):
                 sep = ""
@@ -793,7 +793,7 @@ def export_to(short_name):
 
     def get_csv(out, writer, table, handle_row):
         for tr in db.session.query(table)\
-                .filter_by(app_id=app.id)\
+                .filter_by(project_id=project.id)\
                 .yield_per(1):
             handle_row(writer, tr)
         yield out.getvalue()
@@ -804,7 +804,7 @@ def export_to(short_name):
             table = tables[ty]
         except KeyError:
             return abort(404)
-        return Response(gen_json(table), mimetype='application/json')
+        return Response(gen_json(table), mimetype='project/json')
 
     def create_ckan_datastores(ckan):
         tables = {"task": model.Task, "task_run": model.TaskRun}
@@ -823,15 +823,15 @@ def export_to(short_name):
         msg = msg_1 + "%s ..." % current_app.config['CKAN_URL']
         ckan = Ckan(url=current_app.config['CKAN_URL'],
                     api_key=current_user.ckan_api)
-        app_url = url_for('.details', short_name=app.short_name, _external=True)
+        project_url = url_for('.details', short_name=project.short_name, _external=True)
 
         try:
-            package, e = ckan.package_exists(name=app.short_name)
+            package, e = ckan.package_exists(name=project.short_name)
             if e:
                 raise e
             if package:
                 # Update the package
-                ckan.package_update(app=app, user=app.owner, url=app_url)
+                ckan.package_update(project=project, user=project.owner, url=project_url)
                 if len(package['resources']) == 0:
                     resources = create_ckan_datastores(ckan)
                     ckan.datastore_upsert(name=ty,
@@ -842,7 +842,7 @@ def export_to(short_name):
                     ckan.datastore_create(name=ty)
                     ckan.datastore_upsert(name=ty, records=gen_json(tables[ty]))
             else:
-                ckan.package_create(app=app, user=app.owner, url=app_url,
+                ckan.package_create(project=project, user=project.owner, url=project_url,
                                     tags=current_app.config['BRAND'])
                 resources = create_ckan_datastores(ckan)
                 ckan.datastore_upsert(name=ty,
@@ -873,7 +873,7 @@ def export_to(short_name):
                 model.Task, handle_task,
                 (lambda x: True),
                 lazy_gettext(
-                    "Oops, the application does not have tasks to \
+                    "Oops, the project does not have tasks to \
                            export, if you are the owner add some tasks")),
             "task_run": (
                 model.TaskRun, handle_task_run,
@@ -889,7 +889,7 @@ def export_to(short_name):
         out = StringIO()
         writer = UnicodeWriter(out)
         t = db.session.query(table)\
-            .filter_by(app_id=app.id)\
+            .filter_by(project_id=project.id)\
             .first()
         if t is not None:
             if test(t):
@@ -911,11 +911,11 @@ def export_to(short_name):
     if not (fmt and ty):
         if len(request.args) >= 1:
             abort(404)
-        return render_template('/applications/export.html',
+        return render_template('/projects/export.html',
                                title=title,
                                loading_text=loading_text,
                                ckan_name=current_app.config.get('CKAN_NAME'),
-                               app=app)
+                               project=project)
     if fmt not in export_formats:
         abort(404)
     return {"json": respond_json, "csv": respond_csv, 'ckan': respond_ckan}[fmt](ty)
@@ -924,16 +924,16 @@ def export_to(short_name):
 @blueprint.route('/<short_name>/stats')
 def show_stats(short_name):
     """Returns App Stats"""
-    app = app_by_shortname(short_name)
-    title = app_title(app, "Statistics")
+    project = project_by_shortname(short_name)
+    title = project_title(project, "Statistics")
 
-    if not (len(app.tasks) > 0 and len(app.task_runs) > 0):
-        return render_template('/applications/non_stats.html',
+    if not (len(project.tasks) > 0 and len(project.task_runs) > 0):
+        return render_template('/projects/non_stats.html',
                                title=title,
-                               app=app)
+                               project=project)
 
     dates_stats, hours_stats, users_stats = stats.get_stats(
-        app.id,
+        project.id,
         current_app.config['GEO'])
     anon_pct_taskruns = int((users_stats['n_anon'] * 100) /
                             (users_stats['n_anon'] + users_stats['n_auth']))
@@ -956,23 +956,23 @@ def show_stats(short_name):
                dayStats=dates_stats,
                hourStats=hours_stats)
 
-    return render_template('/applications/stats.html',
+    return render_template('/projects/stats.html',
                            title=title,
-                           appStats=json.dumps(tmp),
+                           projectStats=json.dumps(tmp),
                            userStats=userStats,
-                           app=app)
+                           project=project)
 
 
 @blueprint.route('/<short_name>/tasks/settings')
 @login_required
 def task_settings(short_name):
-    """Settings page for tasks of the application"""
-    app = app_by_shortname(short_name)
+    """Settings page for tasks of the project"""
+    project = project_by_shortname(short_name)
     try:
-        require.app.read(app)
-        require.app.update(app)
-        return render_template('applications/task_settings.html',
-                               app=app)
+        require.project.read(project)
+        require.project.update(project)
+        return render_template('projects/task_settings.html',
+                               project=project)
     except:
         return abort(403)
 
@@ -980,29 +980,29 @@ def task_settings(short_name):
 @blueprint.route('/<short_name>/tasks/redundancy', methods=['GET', 'POST'])
 @login_required
 def task_n_answers(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, lazy_gettext('Redundancy'))
+    project = project_by_shortname(short_name)
+    title = project_title(project, lazy_gettext('Redundancy'))
     form = TaskRedundancyForm()
     try:
-        require.app.read(app)
-        require.app.update(app)
+        require.project.read(project)
+        require.project.update(project)
         if request.method == 'GET':
-            return render_template('/applications/task_n_answers.html',
+            return render_template('/projects/task_n_answers.html',
                                    title=title,
                                    form=form,
-                                   app=app)
+                                   project=project)
         elif request.method == 'POST' and form.validate():
-            sql = text('''UPDATE task SET n_answers=:n_answers WHERE app_id=:app_id''')
-            db.engine.execute(sql, n_answers=form.n_answers.data, app_id=app.id)
+            sql = text('''UPDATE task SET n_answers=:n_answers WHERE project_id=:project_id''')
+            db.engine.execute(sql, n_answers=form.n_answers.data, project_id=project.id)
             msg = lazy_gettext('Redundancy of Tasks updated!')
             flash(msg, 'success')
-            return redirect(url_for('.tasks', short_name=app.short_name))
+            return redirect(url_for('.tasks', short_name=project.short_name))
         else:
             flash(lazy_gettext('Please correct the errors'), 'error')
-            return render_template('/applications/task_n_answers.html',
+            return render_template('/projects/task_n_answers.html',
                                    title=title,
                                    form=form,
-                                   app=app)
+                                   project=project)
     except:
         return abort(403)
 
@@ -1010,38 +1010,38 @@ def task_n_answers(short_name):
 @blueprint.route('/<short_name>/tasks/scheduler', methods=['GET', 'POST'])
 @login_required
 def task_scheduler(short_name):
-    app = app_by_shortname(short_name)
-    title = app_title(app, lazy_gettext('Scheduler'))
+    project = project_by_shortname(short_name)
+    title = project_title(project, lazy_gettext('Scheduler'))
     form = TaskSchedulerForm()
 
     def respond():
-        return render_template('/applications/task_scheduler.html',
+        return render_template('/projects/task_scheduler.html',
                                title=title,
                                form=form,
-                               app=app)
+                               project=project)
     try:
-        require.app.read(app)
-        require.app.update(app)
+        require.project.read(project)
+        require.project.update(project)
     except:
         return abort(403)
 
     if request.method == 'GET':
-        if app.info.get('sched'):
+        if project.info.get('sched'):
             for s in form.sched.choices:
-                if app.info['sched'] == s[0]:
+                if project.info['sched'] == s[0]:
                     form.sched.data = s[0]
                     break
         return respond()
 
     if request.method == 'POST' and form.validate():
         if form.sched.data:
-            app.info['sched'] = form.sched.data
-        cached_apps.reset()
-        db.session.add(app)
+            project.info['sched'] = form.sched.data
+        cached_projects.reset()
+        db.session.add(project)
         db.session.commit()
-        msg = lazy_gettext("Application Task Scheduler updated!")
+        msg = lazy_gettext("Project Task Scheduler updated!")
         flash(msg, 'success')
-        return redirect(url_for('.tasks', short_name=app.short_name))
+        return redirect(url_for('.tasks', short_name=project.short_name))
 
     flash(lazy_gettext('Please correct the errors'), 'error')
     return respond()
