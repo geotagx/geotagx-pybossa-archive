@@ -5,8 +5,8 @@ from pybossa.core import db
 
 def create(task=None):
     if not current_user.is_anonymous():
-        app = db.session.query(model.App).filter_by(id=task.app_id).one()
-        if app.owner_id == current_user.id or current_user.admin is True:
+        project = db.session.query(model.Project).filter_by(id=task.project_id).one()
+        if project.owner_id == current_user.id or current_user.admin is True:
             return True
         else:
             return False
@@ -20,8 +20,8 @@ def read(task=None):
 
 def update(task):
     if not current_user.is_anonymous():
-        app = db.session.query(model.App).filter_by(id=task.app_id).one()
-        if app.owner_id == current_user.id or current_user.admin is True:
+        project = db.session.query(model.Project).filter_by(id=task.project_id).one()
+        if project .owner_id == current_user.id or current_user.admin is True:
             return True
         else:
             return False

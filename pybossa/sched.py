@@ -22,12 +22,12 @@ from pybossa.core import db
 import random
 
 
-def new_task(app_id, user_id=None, user_ip=None, offset=0):
+def new_task(project_id, user_id=None, user_ip=None, offset=0):
     '''Get a new task by calling the appropriate scheduler function.
     '''
-    app = db.session.query(model.App).get(app_id)
-    if not app.allow_anonymous_contributors and user_id is None:
-        error = model.Task(info=dict(error="This application does not allow anonymous contributors"))
+    project = db.session.query(model.Project).get(project_id)
+    if not project.allow_anonymous_contributors and user_id is None:
+        error = model.Task(info=dict(error="This project does not allow anonymous contributors"))
         return error
     else:
         sched_map = {
@@ -37,11 +37,11 @@ def new_task(app_id, user_id=None, user_ip=None, offset=0):
             'random': get_random_task,
             'incremental': get_incremental_task
             }
-        sched = sched_map.get(app.info.get('sched'), sched_map['default'])
-        return sched(app_id, user_id, user_ip, offset=offset)
+        sched = sched_map.get(project.info.get('sched'), sched_map['default'])
+        return sched(project_id, user_id, user_ip, offset=offset)
 
 
-def get_breadth_first_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
+def get_breadth_first_task(project_id, user_id=None, user_ip=None, n_answers=30, offset=0):
     """Gets a new task which have the least number of task runs (excluding the
     current user).
 
@@ -57,20 +57,20 @@ def get_breadth_first_task(app_id, user_id=None, user_ip=None, n_answers=30, off
     """
     # Uncomment the next three lines to profile the sched function
     #import timeit
-    #T = timeit.Timer(lambda: get_candidate_tasks(app_id, user_id,
+    #T = timeit.Timer(lambda: get_candidate_tasks(project_id, user_id,
     #                  user_ip, n_answers))
     #print "First algorithm: %s" % T.timeit(number=1)
 
     sql = text('''
 SELECT task.id, count(task_run.task_id) AS taskcount from task
 LEFT JOIN task_run ON (task.id = task_run.task_id)
-WHERE task.app_id = :app_id AND
+WHERE task.project_id = :project_id AND
 (task_run.user_id IS NULL OR task_run.user_id != :user_id OR task_run.id IS NULL)
 GROUP BY task.id
 ORDER BY taskcount ASC limit 10 ;
 ''')
     # results will be list of (taskid, count)
-    tasks = db.engine.execute(sql, app_id=app_id, user_id=user_id)
+    tasks = db.engine.execute(sql, project_id=project_id, user_id=user_id)
     # ignore n_answers for the present - we will just keep going once we've
     # done as many as we need
     # tasks = [ x[0] for x in tasks if x[1] < n_answers ]
@@ -86,7 +86,7 @@ ORDER BY taskcount ASC limit 10 ;
                 return None
     else:
         return None
-    # candidate_tasks = get_candidate_tasks(app_id, user_id, user_ip, n_answers)
+    # candidate_tasks = get_candidate_tasks(project_id, user_id, user_ip, n_answers)
     # total_remaining = len(candidate_tasks)
     #print "Available tasks %s " % total_remaining
     # if total_remaining == 0:
@@ -94,14 +94,14 @@ ORDER BY taskcount ASC limit 10 ;
     # return candidate_tasks[0]
 
 
-def get_depth_first_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
-    """Gets a new task for a given application"""
+def get_depth_first_task(project_id, user_id=None, user_ip=None, n_answers=30, offset=0):
+    """Gets a new task for a given project"""
     # Uncomment the next three lines to profile the sched function
     #import timeit
-    #T = timeit.Timer(lambda: get_candidate_tasks(app_id, user_id,
+    #T = timeit.Timer(lambda: get_candidate_tasks(project_id, user_id,
     #                  user_ip, n_answers))
     #print "First algorithm: %s" % T.timeit(number=1)
-    candidate_tasks = get_candidate_tasks(app_id, user_id, user_ip, n_answers, offset=offset)
+    candidate_tasks = get_candidate_tasks(project_id, user_id, user_ip, n_answers, offset=offset)
     total_remaining = len(candidate_tasks)
     #print "Available tasks %s " % total_remaining
     if total_remaining == 0:
@@ -115,18 +115,18 @@ def get_depth_first_task(app_id, user_id=None, user_ip=None, n_answers=30, offse
             return None
 
 
-def get_random_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
+def get_random_task(project_id, user_id=None, user_ip=None, n_answers=30, offset=0):
     """Returns a random task for the user"""
-    app = db.session.query(model.App).get(app_id)
+    project = db.session.query(model.Project).get(project_id)
     from random import choice
-    return choice(app.tasks)
+    return choice(project.tasks)
 
 
-def get_incremental_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
-    """Get a new task for a given application with its last given answer.
+def get_incremental_task(project_id, user_id=None, user_ip=None, n_answers=30, offset=0):
+    """Get a new task for a given project with its last given answer.
        It is an important strategy when dealing with large tasks, as
        transcriptions"""
-    candidate_tasks = get_candidate_tasks(app_id, user_id, user_ip, n_answers, offset=0)
+    candidate_tasks = get_candidate_tasks(project_id, user_id, user_ip, n_answers, offset=0)
     total_remaining = len(candidate_tasks)
     if total_remaining == 0:
         return None
@@ -144,26 +144,26 @@ def get_incremental_task(app_id, user_id=None, user_ip=None, n_answers=30, offse
     return task
 
 
-def get_candidate_tasks(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
-    """Gets all available tasks for a given application and user"""
+def get_candidate_tasks(project_id, user_id=None, user_ip=None, n_answers=30, offset=0):
+    """Gets all available tasks for a given project and user"""
 
     print "Using offset = %s" % offset
     if user_id and not user_ip:
         participated_tasks = db.session.query(model.TaskRun.task_id)\
                 .filter_by(user_id=user_id)\
-                .filter_by(app_id=app_id)\
+                .filter_by(project_id=project_id)\
                 .order_by(model.TaskRun.task_id)
     else:
         if not user_ip:
             user_ip = "127.0.0.1"
         participated_tasks = db.session.query(model.TaskRun.task_id)\
                 .filter_by(user_ip=user_ip)\
-                .filter_by(app_id=app_id)\
+                .filter_by(project_id=project_id)\
                 .order_by(model.TaskRun.task_id)
 
     tasks = db.session.query(model.Task)\
             .filter(not_(model.Task.id.in_(participated_tasks.all())))\
-            .filter_by(app_id=app_id)\
+            .filter_by(project_id=project_id)\
             .filter(model.Task.state != "completed")\
             .order_by(model.Task.id)\
             .limit(10)\

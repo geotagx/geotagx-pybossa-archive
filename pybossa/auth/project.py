@@ -1,21 +1,21 @@
 from flaskext.login import current_user
 
 
-def create(app=None):
+def create(project=None):
     return not current_user.is_anonymous()
 
 
-def read(app=None):
+def read(project=None):
     return True
 
 
-def update(app):
-    if not current_user.is_anonymous() and (app.owner_id == current_user.id
+def update(project):
+    if not current_user.is_anonymous() and (project.owner_id == current_user.id
                                             or current_user.admin is True):
         return True
     else:
         return False
 
 
-def delete(app):
-    return update(app)
+def delete(project):
+    return update(project)

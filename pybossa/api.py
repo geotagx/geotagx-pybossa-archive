@@ -15,7 +15,7 @@
 
 import json
 
-from flask import Blueprint, request, abort, Response
+from flask import Blueprint, request, abort, Response, redirect, url_for
 from flask.views import MethodView
 from flaskext.login import current_user
 from werkzeug.exceptions import NotFound
@@ -283,7 +283,7 @@ def new_task(project_id):
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
-@blueprint.route('/app/<int:project_id>/userprogress')
+@blueprint.route('/project/<short_name>/userprogress')
 @crossdomain(origin='*', headers=cors_headers)
 def user_progress(project_id=None, short_name=None):
     """Return a JSON object with two fields regarding the tasks for the user:
@@ -320,3 +320,18 @@ def user_progress(project_id=None, short_name=None):
             return abort(404)
     else:
         return abort(404)
+
+
+@blueprint.route('/app')
+def redirect_app_to_project():
+    return redirect(url_for('.api_project', **request.args), 301)
+
+
+@blueprint.route('/app/<id>/')
+def redirect_app_to_project_id(id):
+    return redirect(url_for('.api_project', id=id, **request.args), 301)
+
+
+@blueprint.route('/app/<project_id>/newtask')
+def redirect_newtask(project_id):
+    return redirect(url_for('.new_task', project_id=project_id, **request.args), 301)

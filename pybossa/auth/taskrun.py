@@ -23,5 +23,5 @@ def update(taskrun):
                 return False
 
 
-def delete(app):
-    return update(app)
+def delete(project):
+    return update(project)

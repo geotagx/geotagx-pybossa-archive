@@ -31,28 +31,28 @@ STATS_TIMEOUT = 24*60*60
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def get_task_runs(app_id):
-    """Return all the Task Runs for a given app_id"""
-    task_runs = db.session.query(TaskRun).filter_by(app_id=app_id).all()
+def get_task_runs(project_id):
+    """Return all the Task Runs for a given project_id"""
+    task_runs = db.session.query(TaskRun).filter_by(project_id=project_id).all()
     return task_runs
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def get_tasks(app_id):
-    """Return all the tasks for a given app_id"""
-    tasks = db.session.query(Task).filter_by(app_id=app_id).all()
+def get_tasks(project_id):
+    """Return all the tasks for a given project_id"""
+    tasks = db.session.query(Task).filter_by(project_id=project_id).all()
     return tasks
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def get_avg_n_tasks(app_id):
+def get_avg_n_tasks(project_id):
     """Return the average number of answers expected per task,
     and the number of tasks"""
     sql = text('''SELECT COUNT(task.id) as n_tasks,
                AVG(task.n_answers) AS "avg" FROM task
-               WHERE task.app_id=:app_id;''')
+               WHERE task.project_id=:project_id;''')
 
-    results = db.engine.execute(sql, app_id=app_id)
+    results = db.engine.execute(sql, project_id=project_id)
     for row in results:
         avg = float(row.avg)
         total_n_tasks = row.n_tasks
@@ -60,8 +60,8 @@ def get_avg_n_tasks(app_id):
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def stats_users(app_id):
-    """Return users's stats for a given app_id"""
+def stats_users(project_id):
+    """Return users's stats for a given project_id"""
     users = {}
     auth_users = []
     anon_users = []
@@ -71,10 +71,10 @@ def stats_users(app_id):
                COUNT(task_run.id) as n_tasks FROM task_run
                WHERE task_run.user_id IS NOT NULL AND
                task_run.user_ip IS NULL AND
-               task_run.app_id=:app_id
+               task_run.project_id=:project_id
                GROUP BY task_run.user_id ORDER BY n_tasks DESC
                LIMIT 5;''')
-    results = db.engine.execute(sql, app_id=app_id)
+    results = db.engine.execute(sql, project_id=project_id)
 
     for row in results:
         auth_users.append([row.user_id, row.n_tasks])
@@ -82,8 +82,8 @@ def stats_users(app_id):
     sql = text('''SELECT count(distinct(task_run.user_id)) AS user_id FROM task_run
                WHERE task_run.user_id IS NOT NULL AND
                task_run.user_ip IS NULL AND
-               task_run.app_id=:app_id;''')
-    results = db.engine.execute(sql, app_id=app_id)
+               task_run.project_id=:project_id;''')
+    results = db.engine.execute(sql, project_id=project_id)
     for row in results:
         users['n_auth'] = row[0]
 
@@ -92,10 +92,10 @@ def stats_users(app_id):
                COUNT(task_run.id) as n_tasks FROM task_run
                WHERE task_run.user_ip IS NOT NULL AND
                task_run.user_id IS NULL AND
-               task_run.app_id=:app_id
+               task_run.project_id=:project_id
                GROUP BY task_run.user_ip ORDER BY n_tasks DESC
                LIMIT 5;''')
-    results = db.engine.execute(sql, app_id=app_id)
+    results = db.engine.execute(sql, project_id=project_id)
 
     for row in results:
         anon_users.append([row.user_ip, row.n_tasks])
@@ -103,8 +103,8 @@ def stats_users(app_id):
     sql = text('''SELECT COUNT(DISTINCT(task_run.user_ip)) AS user_ip FROM task_run
                WHERE task_run.user_ip IS NOT NULL AND
                task_run.user_id IS NULL AND
-               task_run.app_id=:app_id;''')
-    results = db.engine.execute(sql, app_id=app_id)
+               task_run.project_id=:project_id;''')
+    results = db.engine.execute(sql, project_id=project_id)
 
     for row in results:
         users['n_anon'] = row[0]
@@ -113,15 +113,15 @@ def stats_users(app_id):
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def stats_dates(app_id):
+def stats_dates(project_id):
     dates = {}
     dates_anon = {}
     dates_auth = {}
     dates_n_tasks = {}
 
-    task_runs = get_task_runs(app_id)
+    task_runs = get_task_runs(project_id)
 
-    avg, total_n_tasks = get_avg_n_tasks(app_id)
+    avg, total_n_tasks = get_avg_n_tasks(project_id)
 
     for tr in task_runs:
         # Data for dates
@@ -154,7 +154,7 @@ def stats_dates(app_id):
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def stats_hours(app_id):
+def stats_hours(project_id):
     hours = {}
     hours_anon = {}
     hours_auth = {}
@@ -162,7 +162,7 @@ def stats_hours(app_id):
     max_hours_anon = 0
     max_hours_auth = 0
 
-    task_runs = get_task_runs(app_id)
+    task_runs = get_task_runs(project_id)
 
     # initialize hours keys
     for i in range(0, 24):
@@ -196,7 +196,7 @@ def stats_hours(app_id):
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def stats_format_dates(app_id, dates, dates_n_tasks, dates_estimate,
+def stats_format_dates(project_id, dates, dates_n_tasks, dates_estimate,
                        dates_anon, dates_auth):
     """Format dates stats into a JSON format"""
     dayNewStats = dict(label="Anon + Auth",   values=[])
@@ -254,7 +254,7 @@ def stats_format_dates(app_id, dates, dates_n_tasks, dates_estimate,
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def stats_format_hours(app_id, hours, hours_anon, hours_auth,
+def stats_format_hours(project_id, hours, hours_anon, hours_auth,
                        max_hours, max_hours_anon, max_hours_auth):
     """Format hours stats into a JSON format"""
     hourNewStats = dict(label="Anon + Auth", disabled="True", values=[], max=0)
@@ -295,7 +295,7 @@ def stats_format_hours(app_id, hours, hours_anon, hours_auth,
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def stats_format_users(app_id, users, anon_users, auth_users, geo=False):
+def stats_format_users(project_id, users, anon_users, auth_users, geo=False):
     """Format User Stats into JSON"""
     userStats = dict(label="User Statistics", values=[])
     userAnonStats = dict(label="Anonymous Users", values=[], top5=[], locs=[])
@@ -355,14 +355,14 @@ def stats_format_users(app_id, users, anon_users, auth_users, geo=False):
 
 
 @cache.memoize(timeout=STATS_TIMEOUT)
-def get_stats(app_id, geo=False):
+def get_stats(project_id, geo=False):
     """Return the stats a given app"""
     hours, hours_anon, hours_auth, max_hours, \
-        max_hours_anon, max_hours_auth = stats_hours(app_id)
-    users, anon_users, auth_users = stats_users(app_id)
-    dates, dates_n_tasks, dates_anon, dates_auth = stats_dates(app_id)
+        max_hours_anon, max_hours_auth = stats_hours(project_id)
+    users, anon_users, auth_users = stats_users(project_id)
+    dates, dates_n_tasks, dates_anon, dates_auth = stats_dates(project_id)
 
-    avg, total_n_tasks = get_avg_n_tasks(app_id)
+    avg, total_n_tasks = get_avg_n_tasks(project_id)
 
     sorted_answers = sorted(dates.iteritems(), key=operator.itemgetter(0))
     if len(sorted_answers) > 0:
@@ -381,11 +381,11 @@ def get_stats(app_id, geo=False):
         dates_estimate[tmp_str] = pace
         pace = pace + avg_answers_per_day
 
-    dates_stats = stats_format_dates(app_id, dates, dates_n_tasks, dates_estimate,
+    dates_stats = stats_format_dates(project_id, dates, dates_n_tasks, dates_estimate,
                                      dates_anon, dates_auth)
 
-    hours_stats = stats_format_hours(app_id, hours, hours_anon, hours_auth,
+    hours_stats = stats_format_hours(project_id, hours, hours_anon, hours_auth,
                                      max_hours, max_hours_anon, max_hours_auth)
 
-    users_stats = stats_format_users(app_id, users, anon_users, auth_users, geo)
+    users_stats = stats_format_users(project_id, users, anon_users, auth_users, geo)
     return dates_stats, hours_stats, users_stats
