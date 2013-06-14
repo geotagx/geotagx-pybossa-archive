@@ -15,7 +15,7 @@
 from sqlalchemy.sql import func, text
 from pybossa.core import cache
 from pybossa.core import db
-from pybossa.model import Featured, App, TaskRun, Task
+from pybossa.model import Featured, Project, TaskRun, Task
 from pybossa.util import pretty_date
 
 import json
@@ -31,7 +31,7 @@ STATS_TIMEOUT=50
 def get_featured_front_page():
     """Return featured apps"""
     sql = text('''SELECT app.id, app.name, app.short_name, app.info FROM
-               app, featured where app.id=featured.app_id and app.hidden=0''')
+               app, featured where app.id=featured.project_id and app.hidden=0''')
     results = db.engine.execute(sql)
     featured = []
     for row in results:
@@ -46,8 +46,8 @@ def get_top(n=4):
     """Return top n=4 apps"""
     sql = text('''
     SELECT app.id, app.name, app.short_name, app.description, app.info,
-    count(app_id) AS total FROM task_run, app WHERE app_id IS NOT NULL AND
-    app.id=app_id AND app.hidden=0 GROUP BY app.id ORDER BY total DESC LIMIT :limit;
+    count(project_id) AS total FROM task_run, app WHERE project_id IS NOT NULL AND
+    app.id=project_id AND app.hidden=0 GROUP BY app.id ORDER BY total DESC LIMIT :limit;
     ''')
 
     results = db.engine.execute(sql, limit=n)
@@ -61,10 +61,10 @@ def get_top(n=4):
 
 
 @cache.memoize(timeout=60*5)
-def last_activity(app_id):
-    sql = text('''SELECT finish_time FROM task_run WHERE app_id=:app_id
+def last_activity(project_id):
+    sql = text('''SELECT finish_time FROM task_run WHERE project_id=:project_id
                ORDER BY finish_time DESC LIMIT 1''')
-    results = db.engine.execute(sql, app_id=app_id)
+    results = db.engine.execute(sql, project_id=project_id)
     for row in results:
         if row is not None:
             print pretty_date(row[0])
@@ -73,13 +73,13 @@ def last_activity(app_id):
             return None
 
 @cache.memoize()
-def overall_progress(app_id):
-    sql = text('''SELECT COUNT(task_id) FROM task_run WHERE app_id=:app_id''')
-    results = db.engine.execute(sql, app_id=app_id)
+def overall_progress(project_id):
+    sql = text('''SELECT COUNT(task_id) FROM task_run WHERE project_id=:project_id''')
+    results = db.engine.execute(sql, project_id=project_id)
     for row in results:
         n_task_runs = float(row[0])
-    sql = text('''SELECT SUM(n_answers) FROM task WHERE app_id=:app_id''')
-    results = db.engine.execute(sql, app_id=app_id)
+    sql = text('''SELECT SUM(n_answers) FROM task WHERE project_id=:project_id''')
+    results = db.engine.execute(sql, project_id=project_id)
     for row in results:
         if row[0] is None:
             n_expected_task_runs = float(30 * n_task_runs)
@@ -92,10 +92,10 @@ def overall_progress(app_id):
 
 
 @cache.memoize()
-def last_activity(app_id):
-    sql = text('''SELECT finish_time FROM task_run WHERE app_id=:app_id
+def last_activity(project_id):
+    sql = text('''SELECT finish_time FROM task_run WHERE project_id=:project_id
                ORDER BY finish_time DESC LIMIT 1''')
-    results = db.engine.execute(sql, app_id=app_id)
+    results = db.engine.execute(sql, project_id=project_id)
     for row in results:
         if row is not None:
             return pretty_date(row[0])
@@ -120,7 +120,7 @@ def get_featured(category, page=1, per_page=5):
     sql = text('''SELECT app.id, app.name, app.short_name, app.info, app.created,
                app.description,
                "user".fullname AS owner FROM app, featured, "user"
-               WHERE app.id=featured.app_id AND app.hidden=0
+               WHERE app.id=featured.project_id AND app.hidden=0
                AND "user".id=app.owner_id GROUP BY app.id, "user".id
                OFFSET(:offset) LIMIT(:limit);
                ''')
@@ -144,7 +144,7 @@ def n_published():
     sql = text('''
                WITH published_apps as
                (SELECT app.id FROM app, task WHERE
-               app.id=task.app_id AND app.hidden=0 AND app.info
+               app.id=task.project_id AND app.hidden=0 AND app.info
                LIKE('%task_presenter%') GROUP BY app.id)
                SELECT COUNT(id) FROM published_apps;
                ''')
@@ -162,10 +162,10 @@ def get_published(category, page=1, per_page=5):
     sql = text('''
                SELECT app.id, app.name, app.short_name, app.description,
                app.info, app.created, "user".fullname AS owner,
-               featured.app_id as featured
-               FROM task, "user", app LEFT OUTER JOIN featured ON app.id=featured.app_id
+               featured.project_id as featured
+               FROM task, "user", app LEFT OUTER JOIN featured ON app.id=featured.project_id
                WHERE
-               app.id=task.app_id AND app.info LIKE('%task_presenter%')
+               app.id=task.project_id AND app.info LIKE('%task_presenter%')
                AND app.hidden=0
                AND "user".id=app.owner_id
                GROUP BY app.id, "user".id, featured.id ORDER BY app.name
@@ -190,11 +190,11 @@ def get_published(category, page=1, per_page=5):
 
 @cache.cached(key_prefix="number_draft_apps")
 def n_draft():
-    """Return number of draft applications"""
+    """Return number of draft projects"""
     sql = text('''
                SELECT count(app.id) FROM app
-               LEFT JOIN task on app.id=task.app_id
-               WHERE task.app_id IS NULL AND app.info NOT LIKE('%task_presenter%')
+               LEFT JOIN task on app.id=task.project_id
+               WHERE task.project_id IS NULL AND app.info NOT LIKE('%task_presenter%')
                AND app.hidden=0;''')
 
     results = db.engine.execute(sql)
@@ -204,15 +204,15 @@ def n_draft():
 
 @cache.memoize(timeout=50)
 def get_draft(category, page=1, per_page=5):
-    """Return list of draft applications"""
+    """Return list of draft projects"""
 
     count = n_draft()
 
     sql = text('''
                SELECT app.id, app.name, app.short_name, app.created,
                app.description, app.info, "user".fullname as owner
-               FROM "user", app LEFT JOIN task ON app.id=task.app_id
-               WHERE task.app_id IS NULL AND app.info NOT LIKE('%task_presenter%')
+               FROM "user", app LEFT JOIN task ON app.id=task.project_id
+               WHERE task.project_id IS NULL AND app.info NOT LIKE('%task_presenter%')
                AND app.hidden=0
                AND app.owner_id="user".id
                OFFSET :offset
@@ -244,7 +244,7 @@ def n_count(category):
                category.short_name=:category
                AND app.hidden=0
                AND app.info LIKE('%task_presenter%')
-               AND task.app_id=app.id
+               AND task.project_id=app.id
                GROUP BY app.id)
                SELECT COUNT(*) FROM uniq
                ''')
@@ -266,17 +266,17 @@ def get(category, page=1, per_page=5):
     sql = text('''
                SELECT app.id, app.name, app.short_name, app.description,
                app.info, app.created, app.category_id, "user".fullname AS owner,
-               featured.app_id as featured
+               featured.project_id as featured
                FROM "user", task, app
                LEFT OUTER JOIN category ON app.category_id=category.id
-               LEFT OUTER JOIN featured ON app.id=featured.app_id
+               LEFT OUTER JOIN featured ON app.id=featured.project_id
                WHERE
                category.short_name=:category
                AND app.hidden=0
                AND "user".id=app.owner_id
                AND app.info LIKE('%task_presenter%')
-               AND task.app_id=app.id
-               GROUP BY app.id, "user".id, featured.app_id ORDER BY app.name
+               AND task.project_id=app.id
+               GROUP BY app.id, "user".id, featured.project_id ORDER BY app.name
                OFFSET :offset
                LIMIT :limit;''')
 
@@ -311,8 +311,8 @@ def reset():
     cache.delete_memoized(get)
 
 
-def clean(app_id):
+def clean(project_id):
     """Clean all items in cache"""
     reset()
-    cache.delete_memoized(last_activity, app_id)
-    cache.delete_memoized(overall_progress, app_id)
+    cache.delete_memoized(last_activity, project_id)
+    cache.delete_memoized(overall_progress, project_id)
