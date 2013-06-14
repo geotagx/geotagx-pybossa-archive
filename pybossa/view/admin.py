@@ -57,55 +57,55 @@ def index():
 
 
 @blueprint.route('/featured')
-@blueprint.route('/featured/<int:app_id>', methods=['POST', 'DELETE'])
+@blueprint.route('/featured/<int:project_id>', methods=['POST', 'DELETE'])
 @login_required
 @admin_required
-def featured(app_id=None):
-    """List featured apps of PyBossa"""
+def featured(project_id=None):
+    """List featured projects of PyBossa"""
     try:
         categories = cached_cat.get_all()
 
         if request.method == 'GET':
-            apps = {}
+            projects = {}
             for c in categories:
-                n_apps = cached_projects.n_count(category=c.short_name)
-                apps[c.short_name], n_apps = cached_projects.get(category=c.short_name,
+                n_projects = cached_projects.n_count(category=c.short_name)
+                projects[c.short_name], n_projects = cached_projects.get(category=c.short_name,
                                                              page=1,
-                                                             per_page=n_apps)
-            return render_template('/admin/applications.html', apps=apps,
+                                                             per_page=n_projects)
+            return render_template('/admin/projects.html', projects=projects,
                                    categories=categories)
-        elif app_id:
+        elif project_id:
             if request.method == 'POST':
                 cached_projects.reset()
                 f = model.Featured()
-                f.app_id = app_id
-                app = db.session.query(model.Project).get(app_id)
-                require.app.update(app)
-                # Check if the app is already in this table
+                f.project_id = project_id
+                project = db.session.query(model.Project).get(project_id)
+                require.project.update(project)
+                # Check if the project is already in this table
                 tmp = db.session.query(model.Featured)\
-                        .filter(model.Featured.app_id == app_id)\
+                        .filter(model.Featured.project_id == project_id)\
                         .first()
                 if (tmp is None):
                     db.session.add(f)
                     db.session.commit()
                     return json.dumps(f.dictize())
                 else:
-                    msg = "App.id %s alreay in Featured table" % app_id
+                    msg = "Project.id %s alreay in Featured table" % project_id
                     return format_error(msg, 415)
             if request.method == 'DELETE':
                 cached_projects.reset()
                 f = db.session.query(model.Featured)\
-                      .filter(model.Featured.app_id == app_id)\
+                      .filter(model.Featured.project_id == project_id)\
                       .first()
                 if (f):
                     db.session.delete(f)
                     db.session.commit()
                     return "", 204
                 else:
-                    msg = 'App.id %s is not in Featured table' % app_id
+                    msg = 'Project.id %s is not in Featured table' % project_id
                     return format_error(msg, 404)
         else:
-            msg = ('App.id is missing for %s action in featured method' %
+            msg = ('Project.id is missing for %s action in featured method' %
                    request.method)
             return format_error(msg, 415)
     except HTTPException:
@@ -241,14 +241,14 @@ def categories():
             else:
                 flash(lazy_gettext('Please correct the errors'), 'error')
         categories = cached_cat.get_all()
-        n_apps_per_category = dict()
+        n_projects_per_category = dict()
         for c in categories:
-            n_apps_per_category[c.short_name] = cached_projects.n_count(c.short_name)
+            n_projects_per_category[c.short_name] = cached_projects.n_count(c.short_name)
 
         return render_template('admin/categories.html',
                                title=lazy_gettext('Categories'),
                                categories=categories,
-                               n_apps_per_category=n_apps_per_category,
+                               n_projects_per_category=n_projects_per_category,
                                form=form)
     except HTTPException:
         return abort(403)
