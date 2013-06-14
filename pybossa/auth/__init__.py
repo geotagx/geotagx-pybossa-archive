@@ -2,7 +2,7 @@ import inspect
 from flask import abort
 from flaskext.login import current_user
 
-import app
+import project
 import task
 import taskrun
 import category
