@@ -18,7 +18,7 @@ from flask import render_template
 from sqlalchemy.sql import text
 
 from pybossa.core import db, cache
-from pybossa.cache import apps as cached_apps
+from pybossa.cache import projects as cached_projects
 
 blueprint = Blueprint('stats', __name__)
 
@@ -43,9 +43,9 @@ def index():
 
     n_total_users = n_anon + n_auth
 
-    n_published_apps = cached_apps.n_published()
-    n_draft_apps = cached_apps.n_draft()
-    n_total_apps = n_published_apps + n_draft_apps
+    n_published_projects = cached_projects.n_published()
+    n_draft_projects = cached_projects.n_draft()
+    n_total_projects = n_published_projects + n_draft_projects
 
     sql = text('''SELECT COUNT(task.id) AS n_tasks FROM task''')
     results = db.engine.execute(sql)
@@ -57,25 +57,25 @@ def index():
     for row in results:
         n_task_runs = row.n_task_runs
 
-    # Top 5 Most active apps in last 24 hours
-    sql = text('''SELECT app.id, app.name, app.short_name, app.info,
-               COUNT(task_run.app_id) AS n_answers FROM app, task_run
-               WHERE app.id=task_run.app_id
+    # Top 5 Most active projects in last 24 hours
+    sql = text('''SELECT project.id, project.name, project.short_name, project.info,
+               COUNT(task_run.project_id) AS n_answers FROM project, task_run
+               WHERE project.id=task_run.project_id
                AND DATE(task_run.finish_time) > NOW() - INTERVAL '24 hour'
                AND DATE(task_run.finish_time) <= NOW()
-               GROUP BY app.id
+               GROUP BY project.id
                ORDER BY n_answers DESC;''')
 
     results = db.engine.execute(sql, limit=5)
-    top5_apps_24_hours = []
+    top5_projects_24_hours = []
     for row in results:
         tmp = dict(id=row.id, name=row.name, short_name=row.short_name,
                    info=dict(json.loads(row.info)), n_answers=row.n_answers)
-        top5_apps_24_hours.append(tmp)
+        top5_projects_24_hours.append(tmp)
 
     # Top 5 Most active users in last 24 hours
     sql = text('''SELECT "user".id, "user".fullname,
-               COUNT(task_run.app_id) AS n_answers FROM "user", task_run
+               COUNT(task_run.project_id) AS n_answers FROM "user", task_run
                WHERE "user".id=task_run.user_id
                AND DATE(task_run.finish_time) > NOW() - INTERVAL '24 hour'
                AND DATE(task_run.finish_time) <= NOW()
@@ -90,9 +90,9 @@ def index():
         top5_users_24_hours.append(user)
 
     stats = dict(n_total_users=n_total_users, n_auth=n_auth, n_anon=n_anon,
-                 n_published_apps=n_published_apps,
-                 n_draft_apps=n_draft_apps,
-                 n_total_apps=n_total_apps,
+                 n_published_projects=n_published_projects,
+                 n_draft_projects=n_draft_projects,
+                 n_total_projects=n_total_projects,
                  n_tasks=n_tasks,
                  n_task_runs=n_task_runs)
 
@@ -101,10 +101,10 @@ def index():
                      dict(label='Anonymous', value=[0, n_anon]),
                      dict(label='Authenticated', value=[0, n_auth])])
 
-    apps = dict(label="Apps Statistics",
+    projects = dict(label="Apps Statistics",
                 values=[
-                    dict(label='Published', value=[0, n_published_apps]),
-                    dict(label='Draft', value=[0, n_draft_apps])])
+                    dict(label='Published', value=[0, n_published_projects]),
+                    dict(label='Draft', value=[0, n_draft_projects])])
 
     tasks = dict(label="Task and Task Run Statistics",
                  values=[
@@ -113,8 +113,8 @@ def index():
 
     return render_template('/stats/global.html', title=title,
                            users=json.dumps(users),
-                           apps=json.dumps(apps),
+                           projects=json.dumps(projects),
                            tasks=json.dumps(tasks),
                            top5_users_24_hours=top5_users_24_hours,
-                           top5_apps_24_hours=top5_apps_24_hours,
+                           top5_projects_24_hours=top5_projects_24_hours,
                            stats=stats)
