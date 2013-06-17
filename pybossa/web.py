@@ -217,6 +217,11 @@ def redirect_old_app(short_name):
     return redirect(url_for("project.details", short_name=short_name), 301)
 
 
+@app.route("/app/<short_name>/settings")
+def redirect_old_app_settings(short_name):
+    return redirect(url_for("project.settings", short_name=short_name), 301)
+
+
 @app.route("/app/<short_name>/tasks/")
 def redirect_old_app_tasks(short_name):
     return redirect(url_for("project.tasks", short_name=short_name), 301)
