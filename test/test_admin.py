@@ -31,7 +31,7 @@ class TestAdmin(web.Helper):
         dom = BeautifulSoup(res.data)
         err_msg = "There should be an index page for admin users and apps"
         assert "Settings" in res.data, err_msg
-        divs = ['featured-apps', 'users', 'categories']
+        divs = ['featured-projects', 'users', 'categories']
         for div in divs:
             err_msg = "There should be a button for managing %s" % div
             assert dom.find(id=div) is not None, err_msg
