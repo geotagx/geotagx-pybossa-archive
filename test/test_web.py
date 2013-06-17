@@ -1920,7 +1920,7 @@ class TestWeb(web.Helper):
             err_msg = "Task Redundancy should be updated"
             assert dom.find(id='msg_success') is not None, err_msg
             project = db.session.query(model.Project).get(1)
-            for t in app.tasks:
+            for t in project.tasks:
                 assert t.n_answers == n_answers, err_msg
             # Wrong values, triggering the validators
             res = self.task_settings_redundancy(short_name=self.project_short_name,
