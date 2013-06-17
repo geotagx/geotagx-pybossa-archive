@@ -92,17 +92,17 @@ class TestAdmin(web.Helper):
         self.new_project()
         # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
-        assert "Create an App" in res.data,\
+        assert "Create a Project" in res.data,\
             "The project should not be listed in the front page"\
             " as it is not featured"
         # Only apps that have been published can be featured
         self.new_task(1)
-        app = db.session.query(model.App).get(1)
+        app = db.session.query(model.Project).get(1)
         app.info = dict(task_presenter="something")
         db.session.add(app)
         db.session.commit()
         res = self.app.get('/admin/featured', follow_redirects=True)
-        assert "Sample App" in res.data, res.data
+        assert "Sample Project" in res.data, res.data
         assert "Featured" in res.data, res.data
         # Add it to the Featured list
         res = self.app.post('/admin/featured/1')
@@ -111,7 +111,7 @@ class TestAdmin(web.Helper):
         assert f['app_id'] == 1, f
         # Check that it is listed in the front page
         res = self.app.get('/', follow_redirects=True)
-        assert "Sample App" in res.data,\
+        assert "Sample Project" in res.data,\
             "The project should be listed in the front page"\
             " as it is featured"
         # Remove it again from the Featured list
@@ -119,7 +119,7 @@ class TestAdmin(web.Helper):
         assert res.status == "204 NO CONTENT", res.status
         # Check that it is not listed in the front page
         res = self.app.get('/', follow_redirects=True)
-        assert "Sample App" not in res.data,\
+        assert "Sample Project" not in res.data,\
             "The project should not be listed in the front page"\
             " as it is not featured"
 
@@ -134,7 +134,7 @@ class TestAdmin(web.Helper):
         res = self.app.get('/', follow_redirects=True)
         err_msg = ("The project should not be listed in the front page"
                    "as it is not featured")
-        assert "Create an App" in res.data, err_msg
+        assert "Create an Project" in res.data, err_msg
         res = self.app.get('/admin/featured', follow_redirects=True)
         err_msg = ("The user should not be able to access this page"
                    " but the returned status is %s" % res.status)
@@ -157,7 +157,7 @@ class TestAdmin(web.Helper):
         self.signout()
         # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
-        assert "Create an App" in res.data,\
+        assert "Create an Project" in res.data,\
             "The project should not be listed in the front page"\
             " as it is not featured"
         res = self.app.get('/admin/featured', follow_redirects=True)
@@ -316,7 +316,7 @@ class TestAdmin(web.Helper):
         res = self.app.get('/app/rootsampleapp', follow_redirects=True)
         assert "Root" in res.data, "The app should be updated by admin users"
 
-        app = db.session.query(model.App)\
+        app = db.session.query(model.Project)\
                 .filter_by(short_name="rootsampleapp").first()
         juan = db.session.query(model.User).filter_by(name="juan").first()
         assert app.owner_id == juan.id, "Owner_id should be: %s" % juan.id
