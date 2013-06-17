@@ -65,8 +65,8 @@ class TestAPI:
                             owner_id=1)
 
             info = dict(a=0)
-            task = model.Task(app_id=1, info=info)
-            taskrun = model.TaskRun(app_id=1, task_id=1)
+            task = model.Task(project_id=1, info=info)
+            taskrun = model.TaskRun(project_id=1, task_id=1)
             db.session.add(app)
             db.session.add(task)
             db.session.add(taskrun)
@@ -156,15 +156,15 @@ class TestAPI:
         assert error['status'] == 'failed', error
         assert error['target'] == 'task', error
 
-        q = 'app_id=1%3D1;SELECT%20*%20FROM%20task%20WHERE%201'
+        q = 'project_id=1%3D1;SELECT%20*%20FROM%20task%20WHERE%201'
         res = self.app.get('/api/apappp?' + q)
         assert res.status_code == 404, res.data
 
-        q = 'app_id=1%3D1;SELECT%20*%20FROM%20task%20WHERE%201'
+        q = 'project_id=1%3D1;SELECT%20*%20FROM%20task%20WHERE%201'
         res = self.app.get('/api/' + q)
         assert res.status_code == 404, res.data
 
-        q = 'app_id=1%3D1;SELECT%20*%20FROM%20task%20WHERE%201'
+        q = 'project_id=1%3D1;SELECT%20*%20FROM%20task%20WHERE%201'
         res = self.app.get('/api' + q)
         assert res.status_code == 404, res.data
 
@@ -193,75 +193,75 @@ class TestAPI:
         assert data[0]['name'] == 'My New Project', data
 
         # Limits
-        res = self.app.get("/api/taskrun?app_id=1&limit=5")
+        res = self.app.get("/api/taskrun?project_id=1&limit=5")
         print res.data
         data = json.loads(res.data)
         for item in data:
-            assert item['app_id'] == 1, item
+            assert item['project_id'] == 1, item
         assert len(data) == 5, data
 
     def test_query_task(self):
         """Test API query for task endpoint works"""
         # Test for real field
-        res = self.app.get("/api/task?app_id=1")
+        res = self.app.get("/api/task?project_id=1")
         data = json.loads(res.data)
         # Should return one result
         assert len(data) == 10, data
         # Correct result
-        assert data[0]['app_id'] == 1, data
+        assert data[0]['project_id'] == 1, data
 
         # Valid field but wrong value
-        res = self.app.get("/api/task?app_id=99999999")
+        res = self.app.get("/api/task?project_id=99999999")
         data = json.loads(res.data)
         assert len(data) == 0, data
 
         # Multiple fields
-        res = self.app.get('/api/task?app_id=1&state=0')
+        res = self.app.get('/api/task?project_id=1&state=0')
         data = json.loads(res.data)
         # One result
         assert len(data) == 10, data
         # Correct result
-        assert data[0]['app_id'] == 1, data
+        assert data[0]['project_id'] == 1, data
         assert data[0]['state'] == '0', data
 
         # Limits
-        res = self.app.get("/api/task?app_id=1&limit=5")
+        res = self.app.get("/api/task?project_id=1&limit=5")
         print res.data
         data = json.loads(res.data)
         for item in data:
-            assert item['app_id'] == 1, item
+            assert item['project_id'] == 1, item
         assert len(data) == 5, data
 
     def test_query_taskrun(self):
         """Test API query for taskrun endpoint works"""
         # Test for real field
-        res = self.app.get("/api/taskrun?app_id=1")
+        res = self.app.get("/api/taskrun?project_id=1")
         data = json.loads(res.data)
         # Should return one result
         assert len(data) == 10, data
         # Correct result
-        assert data[0]['app_id'] == 1, data
+        assert data[0]['project_id'] == 1, data
 
         # Valid field but wrong value
-        res = self.app.get("/api/taskrun?app_id=99999999")
+        res = self.app.get("/api/taskrun?project_id=99999999")
         data = json.loads(res.data)
         assert len(data) == 0, data
 
         # Multiple fields
-        res = self.app.get('/api/taskrun?app_id=1&task_id=1')
+        res = self.app.get('/api/taskrun?project_id=1&task_id=1')
         data = json.loads(res.data)
         # One result
         assert len(data) == 1, data
         # Correct result
-        assert data[0]['app_id'] == 1, data
+        assert data[0]['project_id'] == 1, data
         assert data[0]['task_id'] == 1, data
 
         # Limits
-        res = self.app.get("/api/taskrun?app_id=1&limit=5")
+        res = self.app.get("/api/taskrun?project_id=1&limit=5")
         print res.data
         data = json.loads(res.data)
         for item in data:
-            assert item['app_id'] == 1, item
+            assert item['project_id'] == 1, item
         assert len(data) == 5, data
 
     def test_02_task_query(self):
@@ -565,8 +565,8 @@ class TestAPI:
         app = db.session.query(model.Project)\
                 .filter_by(owner_id=user.id)\
                 .one()
-        data = dict(app_id=app.id, state='0', info='my task data')
-        root_data = dict(app_id=app.id, state='0', info='my root task data')
+        data = dict(project_id=app.id, state='0', info='my task data')
+        root_data = dict(project_id=app.id, state='0', info='my root task data')
         root_data = json.dumps(root_data)
 
         ########
@@ -596,7 +596,7 @@ class TestAPI:
                 .one()
         assert out, out
         assert_equal(out.info, 'my task data'), out
-        assert_equal(out.app_id, app.id)
+        assert_equal(out.project_id, app.id)
         id_ = out.id
 
         # now the root user
@@ -609,7 +609,7 @@ class TestAPI:
                 .one()
         assert out, out
         assert_equal(out.info, 'my root task data'), out
-        assert_equal(out.app_id, app.id)
+        assert_equal(out.project_id, app.id)
         root_id_ = out.id
 
         # POST with not JSON data
@@ -741,7 +741,7 @@ class TestAPI:
         assert_equal(res.status, '204 NO CONTENT', res.data)
 
         tasks = db.session.query(model.Task)\
-                  .filter_by(app_id=app.id)\
+                  .filter_by(project_id=app.id)\
                   .all()
         assert tasks, tasks
 
@@ -751,13 +751,13 @@ class TestAPI:
                 .filter_by(short_name=Fixtures.app_short_name)\
                 .one()
         tasks = db.session.query(model.Task)\
-                  .filter_by(app_id=app.id)
+                  .filter_by(project_id=app.id)
 
-        app_id = app.id
+        project_id = app.id
 
         # Create taskrun
         data = dict(
-            app_id=app_id,
+            project_id=project_id,
             task_id=tasks[0].id,
             info='my task result')
 
@@ -773,16 +773,16 @@ class TestAPI:
         _id_anonymous = taskrun.id
         assert taskrun, taskrun
         assert taskrun.created, taskrun
-        assert_equal(taskrun.app_id, app_id), taskrun
+        assert_equal(taskrun.project_id, project_id), taskrun
 
         # create task run as authenticated user
         url = '/api/taskrun?api_key=%s' % Fixtures.api_key
         res = self.app.post(url, data=datajson)
         taskrun = db.session.query(model.TaskRun)\
-                    .filter_by(app_id=app_id)\
+                    .filter_by(project_id=project_id)\
                     .all()[-1]
         _id = taskrun.id
-        assert taskrun.app_id == app_id, taskrun
+        assert taskrun.project_id == project_id, taskrun
         assert taskrun.user.name == Fixtures.name, taskrun
 
         # POST with not JSON data
@@ -923,7 +923,7 @@ class TestAPI:
         assert_equal(res.status, '204 NO CONTENT', res.data)
 
         tasks = db.session.query(model.Task)\
-                  .filter_by(app_id=app_id)\
+                  .filter_by(project_id=project_id)\
                   .all()
         assert tasks, tasks
 
@@ -945,7 +945,7 @@ class TestAPI:
         res = self.app.get('/api/app/%s/newtask' % app.id)
         assert res, res
         task = json.loads(res.data)
-        assert_equal(task['app_id'], app.id)
+        assert_equal(task['project_id'], app.id)
 
         # The output should have a mime-type: application/json
         assert res.mimetype == 'application/json', res
@@ -955,7 +955,7 @@ class TestAPI:
         res = self.app.get(url)
         assert res, res
         task = json.loads(res.data)
-        assert_equal(task['app_id'], app.id)
+        assert_equal(task['project_id'], app.id)
 
         # test wit no TaskRun items in the db
         db.session.query(model.TaskRun).delete()
@@ -966,26 +966,26 @@ class TestAPI:
         res = self.app.get('/api/app/%s/newtask' % app.id)
         assert res, res
         task = json.loads(res.data)
-        assert_equal(task['app_id'], app.id)
+        assert_equal(task['project_id'], app.id)
 
         # as a real user
         url = '/api/app/%s/newtask?api_key=%s' % (app.id, Fixtures.api_key)
         res = self.app.get(url)
         assert res, res
         task = json.loads(res.data)
-        assert_equal(task['app_id'], app.id)
+        assert_equal(task['project_id'], app.id)
 
     def test_07_user_progress_anonymous(self):
         """Test API userprogress as anonymous works"""
         self.signout()
         app = db.session.query(model.Project).get(1)
         tasks = db.session.query(model.Task)\
-                  .filter(model.Task.app_id == app.id)\
+                  .filter(model.Task.project_id == app.id)\
                   .all()
 
         # User ID = 2 because, the 1 is the root user
         taskruns = db.session.query(model.TaskRun)\
-                     .filter(model.TaskRun.app_id == app.id)\
+                     .filter(model.TaskRun.project_id == app.id)\
                      .filter(model.TaskRun.user_id == 2)\
                      .all()
 
@@ -1003,7 +1003,7 @@ class TestAPI:
         data = json.loads(res.data)
         print data
         # Add a new TaskRun and check again
-        tr = model.TaskRun(app_id=1, task_id=data['id'], user_id=1,
+        tr = model.TaskRun(project_id=1, task_id=data['id'], user_id=1,
                            info={'answer': u'annakarenina'})
         db.session.add(tr)
         db.session.commit()
@@ -1026,11 +1026,11 @@ class TestAPI:
         app = db.session.query(model.Project)\
                 .get(1)
         tasks = db.session.query(model.Task)\
-                  .filter(model.Task.app_id == app.id)\
+                  .filter(model.Task.project_id == app.id)\
                   .all()
 
         taskruns = db.session.query(model.TaskRun)\
-                     .filter(model.TaskRun.app_id == app.id)\
+                     .filter(model.TaskRun.project_id == app.id)\
                      .filter(model.TaskRun.user_id == user.id)\
                      .all()
 
@@ -1046,7 +1046,7 @@ class TestAPI:
         data = json.loads(res.data)
 
         # Add a new TaskRun and check again
-        tr = model.TaskRun(app_id=1, task_id=data['id'], user_id=user.id,
+        tr = model.TaskRun(project_id=1, task_id=data['id'], user_id=user.id,
                            info={'answer': u'annakarenina'})
         db.session.add(tr)
         db.session.commit()
@@ -1062,30 +1062,30 @@ class TestAPI:
 
     def test_09_delete_app_cascade(self):
         """Test API delete app deletes associated tasks and taskruns"""
-        tasks = self.app.get('/api/task?app_id=1&limit=1000')
+        tasks = self.app.get('/api/task?project_id=1&limit=1000')
         tasks = json.loads(tasks.data)
 
-        task_runs = self.app.get('/api/taskrun?app_id=1&limit=1000')
+        task_runs = self.app.get('/api/taskrun?project_id=1&limit=1000')
         task_runs = json.loads(task_runs.data)
         url = '/api/app/%s?api_key=%s' % (1, Fixtures.api_key)
         self.app.delete(url)
 
         for task in tasks:
             t = db.session.query(model.Task)\
-                  .filter_by(app_id=1)\
+                  .filter_by(project_id=1)\
                   .filter_by(id=task['id'])\
                   .all()
             assert len(t) == 0, "There should not be any task"
 
             tr = db.session.query(model.TaskRun)\
-                   .filter_by(app_id=1)\
+                   .filter_by(project_id=1)\
                    .filter_by(task_id=task['id'])\
                    .all()
             assert len(tr) == 0, "There should not be any task run"
 
     def test_10_delete_task_cascade(self):
         """Test API delete app deletes associated tasks and taskruns"""
-        tasks = self.app.get('/api/task?app_id=1&limit=1000')
+        tasks = self.app.get('/api/task?project_id=1&limit=1000')
         tasks = json.loads(tasks.data)
 
         for t in tasks:
@@ -1094,7 +1094,7 @@ class TestAPI:
             assert_equal(res.status, '204 NO CONTENT', res.data)
             tr = []
             tr = db.session.query(model.TaskRun)\
-                   .filter_by(app_id=1)\
+                   .filter_by(project_id=1)\
                    .filter_by(task_id=t['id'])\
                    .all()
             assert len(tr) == 0, "There should not be any task run for task"
@@ -1108,8 +1108,8 @@ class TestAPI:
         url = '/api/app/%s/newtask' % app.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
-        err_msg = "The task.app_id is different from the app.id"
-        assert task['app_id'] == app.id, err_msg
+        err_msg = "The task.project_id is different from the app.id"
+        assert task['project_id'] == app.id, err_msg
         err_msg = "There should not be an error message"
         assert task['info'].get('error') is None, err_msg
         err_msg = "There should be a question"
@@ -1121,8 +1121,8 @@ class TestAPI:
         url = '/api/app/%s/newtask' % app.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
-        err_msg = "The task.app_id is different from the app.id"
-        assert task['app_id'] == app.id, err_msg
+        err_msg = "The task.project_id is different from the app.id"
+        assert task['project_id'] == app.id, err_msg
         err_msg = "There should not be an error message"
         assert task['info'].get('error') is None, err_msg
         err_msg = "There should be a question"
@@ -1138,9 +1138,9 @@ class TestAPI:
         url = '/api/app/%s/newtask' % app.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
-        err_msg = "The task.app_id should be null"
+        err_msg = "The task.project_id should be null"
         print task
-        assert task['app_id'] is None, err_msg
+        assert task['project_id'] is None, err_msg
         err_msg = "There should be an error message"
         err = "This project does not allow anonymous contributors"
         assert task['info'].get('error') == err, err_msg
@@ -1153,8 +1153,8 @@ class TestAPI:
         url = '/api/app/%s/newtask' % app.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
-        err_msg = "The task.app_id is different from the app.id"
-        assert task['app_id'] == app.id, err_msg
+        err_msg = "The task.project_id is different from the app.id"
+        assert task['project_id'] == app.id, err_msg
         err_msg = "There should not be an error message"
         assert task['info'].get('error') is None, err_msg
         err_msg = "There should be a question"
