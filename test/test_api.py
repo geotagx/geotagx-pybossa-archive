@@ -171,12 +171,12 @@ class TestAPI:
     def test_query_app(self):
         """Test API query for app endpoint works"""
         # Test for real field
-        res = self.app.get("/api/project?short_name=test-app")
+        res = self.app.get("/api/project?short_name=test-project")
         data = json.loads(res.data)
         # Should return one result
         assert len(data) == 1, data
         # Correct result
-        assert data[0]['short_name'] == 'test-app', data
+        assert data[0]['short_name'] == 'test-project', data
 
         # Valid field but wrong value
         res = self.app.get("/api/project?short_name=wrongvalue")
@@ -184,12 +184,12 @@ class TestAPI:
         assert len(data) == 0, data
 
         # Multiple fields
-        res = self.app.get('/api/project?short_name=test-app&name=My New Project')
+        res = self.app.get('/api/project?short_name=test-project&name=My New Project')
         data = json.loads(res.data)
         # One result
         assert len(data) == 1, data
         # Correct result
-        assert data[0]['short_name'] == 'test-app', data
+        assert data[0]['short_name'] == 'test-project', data
         assert data[0]['name'] == 'My New Project', data
 
         # Limits
