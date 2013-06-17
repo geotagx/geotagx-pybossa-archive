@@ -108,7 +108,7 @@ class TestAdmin(web.Helper):
         res = self.app.post('/admin/featured/1')
         f = json.loads(res.data)
         assert f['id'] == 1, f
-        assert f['app_id'] == 1, f
+        assert f['project_id'] == 1, f
         # Check that it is listed in the front page
         res = self.app.get('/', follow_redirects=True)
         assert "Sample Project" in res.data,\
@@ -343,7 +343,7 @@ class TestAdmin(web.Helper):
         """Test ADMIN can delete an app's tasks that belongs to another user"""
         # Admin
         Fixtures.create()
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         assert len(tasks) > 0, "len(app.tasks) > 0"
         res = self.signin(email=u'root@root.com', password=u'tester' + 'root')
         res = self.app.get('/app/test-app/tasks/delete', follow_redirects=True)
@@ -352,7 +352,7 @@ class TestAdmin(web.Helper):
         res = self.app.post('/app/test-app/tasks/delete', follow_redirects=True)
         err_msg = "Admin should get 200 in POST"
         assert res.status_code == 200, err_msg
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         assert len(tasks) == 0, "len(app.tasks) != 0"
 
     def test_19_admin_list_categories(self):
