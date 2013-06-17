@@ -1313,7 +1313,7 @@ class TestWeb(web.Helper):
         assert "Sample Project" in res.data, "Does not return to project details"
         project = db.session.query(model.Project).first()
         err_msg = "Task Presenter failed to update"
-        assert app.info['task_presenter'] == 'Some HTML code!', err_msg
+        assert project.info['task_presenter'] == 'Some HTML code!', err_msg
 
     @patch('pybossa.ckan.requests.get')
     def test_48_update_project_info(self, Mock):
