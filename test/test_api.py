@@ -115,7 +115,7 @@ class TestAPI:
             if endpoint == 'project':
                 assert len(data) == 1, data
                 project = data[0]
-                assert app['info']['total'] == 150, data
+                assert project['info']['total'] == 150, data
                 # The output should have a mime-type: application/json
                 assert res.mimetype == 'application/json', res
 
@@ -136,8 +136,7 @@ class TestAPI:
     def test_query_search_wrongfield(self):
         """ Test API query search works"""
         # Test first a non-existant field for all end-points
-        endpoints = ['app', 'task', 'taskrun']
-        for endpoint in endpoints:
+        for endpoint in self.endpoints:
             res = self.app.get("/api/%s?wrongfield=value" % endpoint)
             err = json.loads(res.data)
             assert res.status_code == 415, err
