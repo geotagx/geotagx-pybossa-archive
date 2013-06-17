@@ -12,7 +12,7 @@ FakeRequest = namedtuple('FakeRequest', ['text', 'status_code', 'headers'])
 
 
 class TestCkanWeb(web_helper.Helper):
-    url = "/app/%s/tasks/export" % Fixtures.app_short_name
+    url = "/project/%s/tasks/export" % Fixtures.project_short_name
 
     def setUp(self):
         super(TestCkanWeb, self).setUp()
@@ -116,7 +116,7 @@ class TestCkanModule(object):
                     "cache_url": None,
                     "name": "task",
                     "created": "2013-04-12T05:50:41.776512",
-                    "url": "http://localhost:5000/app/urbanpark/",
+                    "url": "http://localhost:5000/project/urbanpark/",
                     "webstore_url": None,
                     "position": 0,
                     "revision_id": "85027e11-fcbd-4362-9298-9755c99729b0",
@@ -143,7 +143,7 @@ class TestCkanModule(object):
                     "cache_url": None,
                     "name": "task_run",
                     "created": "2013-04-12T05:50:45.193953",
-                    "url": "http://localhost:5000/app/urbanpark/",
+                    "url": "http://localhost:5000/project/urbanpark/",
                     "webstore_url": None,
                     "position": 1,
                     "revision_id": "a1c52da7-5f2a-4bd4-8e58-b58e3caa11b5",
@@ -159,7 +159,7 @@ class TestCkanModule(object):
             "relationships_as_subject": [],
             "name": "urbanpark",
             "isopen": False,
-            "url": "http://localhost:5000/app/urbanpark/",
+            "url": "http://localhost:5000/project/urbanpark/",
             "notes": "",
             "title": "Urban Parks",
             "extras": [],
@@ -301,7 +301,7 @@ class TestCkanModule(object):
         Mock.return_value = html_request
         with self.app.test_request_context('/'):
             # Resource that exists
-            app = model.App(short_name='urbanpark', name='Urban Parks')
+            app = model.Project(short_name='urbanpark', name='Urban Parks')
             user = model.User(fullname='Daniel Lombrana Gonzalez')
             out = self.ckan.package_create(app=app, user=user, url="http://something.com")
             err_msg = "The package ID should be the same"
@@ -330,7 +330,7 @@ class TestCkanModule(object):
         Mock.return_value = pkg_request
         with self.app.test_request_context('/'):
             # Resource that exists
-            app = model.App(short_name='urbanpark', name='Urban Parks')
+            app = model.Project(short_name='urbanpark', name='Urban Parks')
             user = model.User(fullname='Daniel Lombrana Gonzalez')
             self.ckan.package_create(app=app, user=user, url="http://something.com")
             Mock.return_value = rsrc_request
@@ -426,7 +426,7 @@ class TestCkanModule(object):
         Mock.return_value = html_request
         with self.app.test_request_context('/'):
             # Resource that exists
-            app = model.App(short_name='urbanpark', name='Urban Parks')
+            app = model.Project(short_name='urbanpark', name='Urban Parks')
             user = model.User(fullname='Daniel Lombrana Gonzalez')
             out = self.ckan.package_update(app=app, user=user, url="http://something.com")
             err_msg = "The package ID should be the same"
