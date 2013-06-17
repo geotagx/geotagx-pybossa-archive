@@ -96,11 +96,11 @@ class TestAPI:
 
     def test_01_app_query(self):
         """ Test API Project query"""
-        res = self.app.get('/api/app')
+        res = self.app.get('/api/project')
         data = json.loads(res.data)
         assert len(data) == 1, data
         project = data[0]
-        assert app['info']['total'] == 150, data
+        assert project['info']['total'] == 150, data
 
         # The output should have a mime-type: application/json
         assert res.mimetype == 'application/json', res
@@ -297,7 +297,7 @@ class TestAPI:
                                Long Description</div>')
         data = json.dumps(data)
         # no api-key
-        res = self.app.post('/api/app', data=data)
+        res = self.app.post('/api/project', data=data)
         assert_equal(res.status, '403 FORBIDDEN',
                      'Should not be allowed to create')
         # now a real user
@@ -344,7 +344,7 @@ class TestAPI:
         data = {'name': 'My New Title'}
         datajson = json.dumps(data)
         ## anonymous
-        res = self.app.put('/api/app/%s' % id_,
+        res = self.app.put('/api/project/%s' % id_,
                            data=data)
         error_msg = 'Anonymous should not be allowed to update'
         assert_equal(res.status, '403 FORBIDDEN', error_msg)
@@ -354,7 +354,7 @@ class TestAPI:
         assert error['exception_cls'] == 'Forbidden', error
 
         ### real user but not allowed as not owner!
-        url = '/api/app/%s?api_key=%s' % (id_, Fixtures.api_key_2)
+        url = '/api/project/%s?api_key=%s' % (id_, Fixtures.api_key_2)
         res = self.app.put(url, data=datajson)
         error_msg = 'Should not be able to update apps of others'
         assert_equal(res.status, '401 UNAUTHORIZED', error_msg)
@@ -363,7 +363,7 @@ class TestAPI:
         assert error['action'] == 'PUT', error
         assert error['exception_cls'] == 'Unauthorized', error
 
-        res = self.app.put('/api/app/%s?api_key=%s' % (id_, Fixtures.api_key),
+        res = self.app.put('/api/project/%s?api_key=%s' % (id_, Fixtures.api_key),
                            data=datajson)
 
         assert_equal(res.status, '200 OK', res.data)
@@ -376,7 +376,7 @@ class TestAPI:
         # With fake data
         data['algo'] = 13
         datajson = json.dumps(data)
-        res = self.app.put('/api/app/%s?api_key=%s' % (id_, Fixtures.api_key),
+        res = self.app.put('/api/project/%s?api_key=%s' % (id_, Fixtures.api_key),
                            data=datajson)
         err = json.loads(res.data)
         assert res.status_code == 415, err
@@ -386,7 +386,7 @@ class TestAPI:
 
         # With not JSON data
         datajson = data
-        res = self.app.put('/api/app/%s?api_key=%s' % (id_, Fixtures.api_key),
+        res = self.app.put('/api/project/%s?api_key=%s' % (id_, Fixtures.api_key),
                            data=datajson)
         err = json.loads(res.data)
         assert res.status_code == 415, err
@@ -402,7 +402,7 @@ class TestAPI:
                                Long Description</div>')
 
         datajson = json.dumps(data)
-        res = self.app.put('/api/app/%s?api_key=%s&search=select1' % (id_, Fixtures.api_key),
+        res = self.app.put('/api/project/%s?api_key=%s&search=select1' % (id_, Fixtures.api_key),
                            data=datajson)
         err = json.loads(res.data)
         print err
@@ -413,7 +413,7 @@ class TestAPI:
 
         # test delete
         ## anonymous
-        res = self.app.delete('/api/app/%s' % id_, data=data)
+        res = self.app.delete('/api/project/%s' % id_, data=data)
         error_msg = 'Anonymous should not be allowed to delete'
         assert_equal(res.status, '403 FORBIDDEN', error_msg)
         error = json.loads(res.data)
@@ -421,7 +421,7 @@ class TestAPI:
         assert error['action'] == 'DELETE', error
         assert error['target'] == 'app', error
         ### real user but not allowed as not owner!
-        url = '/api/app/%s?api_key=%s' % (id_, Fixtures.api_key_2)
+        url = '/api/project/%s?api_key=%s' % (id_, Fixtures.api_key_2)
         res = self.app.delete(url, data=datajson)
         error_msg = 'Should not be able to delete apps of others'
         assert_equal(res.status, '401 UNAUTHORIZED', error_msg)
@@ -430,13 +430,13 @@ class TestAPI:
         assert error['action'] == 'DELETE', error
         assert error['target'] == 'app', error
 
-        url = '/api/app/%s?api_key=%s' % (id_, Fixtures.api_key)
+        url = '/api/project/%s?api_key=%s' % (id_, Fixtures.api_key)
         res = self.app.delete(url, data=datajson)
 
         assert_equal(res.status, '204 NO CONTENT', res.data)
 
         # delete an app that does not exist
-        url = '/api/app/5000?api_key=%s' % Fixtures.api_key
+        url = '/api/project/5000?api_key=%s' % Fixtures.api_key
         res = self.app.delete(url, data=datajson)
         error = json.loads(res.data)
         assert res.status_code == 404, error
@@ -446,7 +446,7 @@ class TestAPI:
         assert error['exception_cls'] == 'NotFound', error
 
         # delete an app that does not exist
-        url = '/api/app/?api_key=%s' % Fixtures.api_key
+        url = '/api/project/?api_key=%s' % Fixtures.api_key
         res = self.app.delete(url, data=datajson)
         assert res.status_code == 404, error
 
@@ -506,7 +506,7 @@ class TestAPI:
         data = {'name': 'My New Title'}
         datajson = json.dumps(data)
         ### admin user but not owner!
-        url = '/api/app/%s?api_key=%s' % (id_, Fixtures.root_api_key)
+        url = '/api/project/%s?api_key=%s' % (id_, Fixtures.root_api_key)
         res = self.app.put(url, data=datajson)
 
         assert_equal(res.status, '200 OK', res.data)
@@ -543,7 +543,7 @@ class TestAPI:
         data.pop('wrongfield')
 
         # test delete
-        url = '/api/app/%s?api_key=%s' % (id_, Fixtures.root_api_key)
+        url = '/api/project/%s?api_key=%s' % (id_, Fixtures.root_api_key)
         # DELETE with not allowed args
         res = self.app.delete(url + "&foo=bar", data=json.dumps(data))
         err = json.loads(res.data)
@@ -942,7 +942,7 @@ class TestAPI:
 
         # anonymous
         # test getting a new task
-        res = self.app.get('/api/app/%s/newtask' % project.id)
+        res = self.app.get('/api/project/%s/newtask' % project.id)
         assert res, res
         task = json.loads(res.data)
         assert_equal(task['project_id'], project.id)
@@ -951,7 +951,7 @@ class TestAPI:
         assert res.mimetype == 'application/json', res
 
         # as a real user
-        url = '/api/app/%s/newtask?api_key=%s' % (project.id, Fixtures.api_key)
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, Fixtures.api_key)
         res = self.app.get(url)
         assert res, res
         task = json.loads(res.data)
@@ -963,13 +963,13 @@ class TestAPI:
 
         # anonymous
         # test getting a new task
-        res = self.app.get('/api/app/%s/newtask' % project.id)
+        res = self.app.get('/api/project/%s/newtask' % project.id)
         assert res, res
         task = json.loads(res.data)
         assert_equal(task['project_id'], project.id)
 
         # as a real user
-        url = '/api/app/%s/newtask?api_key=%s' % (project.id, Fixtures.api_key)
+        url = '/api/project/%s/newtask?api_key=%s' % (project.id, Fixtures.api_key)
         res = self.app.get(url)
         assert res, res
         task = json.loads(res.data)
@@ -989,7 +989,7 @@ class TestAPI:
                      .filter(model.TaskRun.user_id == 2)\
                      .all()
 
-        res = self.app.get('/api/app/1/userprogress', follow_redirects=True)
+        res = self.app.get('/api/project/1/userprogress', follow_redirects=True)
         data = json.loads(res.data)
 
         error_msg = "The reported total number of tasks is wrong"
@@ -999,7 +999,7 @@ class TestAPI:
         print len(taskruns)
         assert len(taskruns) == data['done'], data
 
-        res = self.app.get('/api/app/1/newtask')
+        res = self.app.get('/api/project/1/newtask')
         data = json.loads(res.data)
         print data
         # Add a new TaskRun and check again
@@ -1008,7 +1008,7 @@ class TestAPI:
         db.session.add(tr)
         db.session.commit()
 
-        res = self.app.get('/api/app/1/userprogress', follow_redirects=True)
+        res = self.app.get('/api/project/1/userprogress', follow_redirects=True)
         data = json.loads(res.data)
         error_msg = "The reported total number of tasks is wrong"
         assert len(tasks) == data['total'], error_msg
@@ -1034,7 +1034,7 @@ class TestAPI:
                      .filter(model.TaskRun.user_id == user.id)\
                      .all()
 
-        res = self.app.get('/api/app/1/userprogress', follow_redirects=True)
+        res = self.app.get('/api/project/1/userprogress', follow_redirects=True)
         data = json.loads(res.data)
         error_msg = "The reported total number of tasks is wrong"
         assert len(tasks) == data['total'], error_msg
@@ -1042,7 +1042,7 @@ class TestAPI:
         error_msg = "The reported number of done tasks is wrong"
         assert len(taskruns) == data['done'], error_msg
 
-        res = self.app.get('/api/app/1/newtask')
+        res = self.app.get('/api/project/1/newtask')
         data = json.loads(res.data)
 
         # Add a new TaskRun and check again
@@ -1051,7 +1051,7 @@ class TestAPI:
         db.session.add(tr)
         db.session.commit()
 
-        res = self.app.get('/api/app/1/userprogress', follow_redirects=True)
+        res = self.app.get('/api/project/1/userprogress', follow_redirects=True)
         data = json.loads(res.data)
         error_msg = "The reported total number of tasks is wrong"
         assert len(tasks) == data['total'], error_msg
@@ -1067,7 +1067,7 @@ class TestAPI:
 
         task_runs = self.app.get('/api/taskrun?project_id=1&limit=1000')
         task_runs = json.loads(task_runs.data)
-        url = '/api/app/%s?api_key=%s' % (1, Fixtures.api_key)
+        url = '/api/project/%s?api_key=%s' % (1, Fixtures.api_key)
         self.app.delete(url)
 
         for task in tasks:
@@ -1105,7 +1105,7 @@ class TestAPI:
 
         # All users are allowed to participate by default
         # As Anonymous user
-        url = '/api/app/%s/newtask' % project.id
+        url = '/api/project/%s/newtask' % project.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
         err_msg = "The task.project_id is different from the project.id"
@@ -1118,7 +1118,7 @@ class TestAPI:
         # As registered user
         self.register()
         self.signin()
-        url = '/api/app/%s/newtask' % project.id
+        url = '/api/project/%s/newtask' % project.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
         err_msg = "The task.project_id is different from the project.id"
@@ -1135,7 +1135,7 @@ class TestAPI:
         db.session.commit()
 
         # As Anonymous user
-        url = '/api/app/%s/newtask' % project.id
+        url = '/api/project/%s/newtask' % project.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
         err_msg = "The task.project_id should be null"
@@ -1150,7 +1150,7 @@ class TestAPI:
         # As registered user
         res = self.signin()
         print res.data
-        url = '/api/app/%s/newtask' % project.id
+        url = '/api/project/%s/newtask' % project.id
         res = self.app.get(url, follow_redirects=True)
         task = json.loads(res.data)
         err_msg = "The task.project_id is different from the project.id"
