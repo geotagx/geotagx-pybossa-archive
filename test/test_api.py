@@ -112,7 +112,7 @@ class TestAPI:
             res = self.app.get(url)
             data = json.loads(res.data)
 
-            if endpoint == 'app':
+            if endpoint == 'project':
                 assert len(data) == 1, data
                 project = data[0]
                 assert app['info']['total'] == 150, data
