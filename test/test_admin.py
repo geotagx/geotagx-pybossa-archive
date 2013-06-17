@@ -134,7 +134,7 @@ class TestAdmin(web.Helper):
         res = self.app.get('/', follow_redirects=True)
         err_msg = ("The project should not be listed in the front page"
                    "as it is not featured")
-        assert "Create an Project" in res.data, err_msg
+        assert "Create a Project" in res.data, err_msg
         res = self.app.get('/admin/featured', follow_redirects=True)
         err_msg = ("The user should not be able to access this page"
                    " but the returned status is %s" % res.status)
@@ -157,7 +157,7 @@ class TestAdmin(web.Helper):
         self.signout()
         # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
-        assert "Create an Project" in res.data,\
+        assert "Create a Project" in res.data,\
             "The project should not be listed in the front page"\
             " as it is not featured"
         res = self.app.get('/admin/featured', follow_redirects=True)
