@@ -305,19 +305,19 @@ class TestAdmin(web.Helper):
         self.signout()
         # Sign in with the root user
         self.signin()
-        res = self.app.get('/project/sampleapp/settings')
+        res = self.app.get('/project/sampleproject/settings')
         err_msg = "Admin users should be able to get the settings page for any app"
         assert res.status == "200 OK", err_msg
         res = self.update_project(method="GET")
         assert "Update the project" in res.data,\
             "The app should be updated by admin users"
         res = self.update_project(new_name="Root",
-                                      new_short_name="rootsampleapp")
-        res = self.app.get('/app/rootsampleapp', follow_redirects=True)
+                                      new_short_name="rootsampleproject")
+        res = self.app.get('/app/rootsampleproject', follow_redirects=True)
         assert "Root" in res.data, "The app should be updated by admin users"
 
         app = db.session.query(model.Project)\
-                .filter_by(short_name="rootsampleapp").first()
+                .filter_by(short_name="rootsampleproject").first()
         juan = db.session.query(model.User).filter_by(name="juan").first()
         assert app.owner_id == juan.id, "Owner_id should be: %s" % juan.id
         assert app.owner_id != 1, "The owner should be not updated"
