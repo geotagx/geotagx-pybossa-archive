@@ -26,8 +26,8 @@ class Helper(web.Helper):
         else:
             return True
 
-    def del_task_runs(self, app_id=1):
+    def del_task_runs(self, project_id=1):
         """Deletes all TaskRuns for a given app_id"""
-        db.session.query(model.TaskRun).filter_by(app_id=1).delete()
+        db.session.query(model.TaskRun).filter_by(project_id=1).delete()
         db.session.commit()
         db.session.remove()
