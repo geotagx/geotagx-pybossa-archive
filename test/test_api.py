@@ -67,12 +67,12 @@ class TestAPI:
             info = dict(a=0)
             task = model.Task(project_id=1, info=info)
             taskrun = model.TaskRun(project_id=1, task_id=1)
-            db.session.add(app)
+            db.session.add(project)
             db.session.add(task)
             db.session.add(taskrun)
         db.session.commit()
 
-        res = self.app.get('/api/app')
+        res = self.app.get('/api/project')
         data = json.loads(res.data)
         assert len(data) == 20, len(data)
 
