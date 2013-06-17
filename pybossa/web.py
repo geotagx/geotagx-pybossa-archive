@@ -205,10 +205,42 @@ def about():
     """Render the about template"""
     return render_template("/home/about.html")
 
+
 @app.route("/search")
 def search():
     """Render search results page"""
     return render_template("/home/search.html")
+
+
+@app.route("/app/<short_name>/")
+def redirect_old_app(short_name):
+    return redirect(url_for("project.details", short_name=short_name), 301)
+
+
+@app.route("/app/<short_name>/tasks/")
+def redirect_old_app_tasks(short_name):
+    return redirect(url_for("project.tasks", short_name=short_name), 301)
+
+
+@app.route('/app/<short_name>/tasks/browse', defaults={'page': 1})
+@app.route('/app/<short_name>/tasks/browse/<int:page>')
+def redirect_old_app_tasks_browse(short_name, page):
+    return redirect(url_for("project.tasks_browse", short_name=short_name,
+                            page=page), 301)
+
+
+@app.route("/app/<short_name>/presenter")
+@app.route("/app/<short_name>/newtask")
+def redirect_old_app_newtask(short_name):
+    return redirect(url_for("project.presenter", short_name=short_name), 301)
+
+
+@app.route('/app/category/<string:category>/', defaults={'page': 1})
+@app.route('/app/category/<string:category>/page/<int:page>/')
+def redirect_old_app_category(category, page):
+    return redirect(url_for("project.project_cat_index", category=category,
+                            page=page), 301)
+
 
 def get_port():
     port = os.environ.get('PORT', '')

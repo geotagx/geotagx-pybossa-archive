@@ -6,7 +6,7 @@ class Helper(object):
     """Class to help testing the web interface"""
 
     user = User()
-    app_short_name = "sampleapp"
+    project_short_name = "sampleproject"
 
     def setUp(self):
         self.app = web.app.test_client()
@@ -88,18 +88,18 @@ class Helper(object):
             print "Creating default ones"
             Fixtures.create_categories()
 
-    def new_application(self, method="POST", name="Sample App",
-                        short_name="sampleapp", description="Description",
+    def new_project(self, method="POST", name="Sample Project",
+                        short_name="sampleproject", description="Description",
                         thumbnail='An Icon link',
                         allow_anonymous_contributors='True',
                         category_id="1",
                         long_description=u'<div id="long_desc">Long desc</div>',
                         hidden=False):
-        """Helper function to create an application"""
+        """Helper function to create an project"""
         if method == "POST":
             self.create_categories()
             if hidden:
-                return self.app.post("/app/new", data={
+                return self.app.post("/project/new", data={
                     'name': name,
                     'short_name': short_name,
                     'description': description,
@@ -110,7 +110,7 @@ class Helper(object):
                     'hidden': hidden,
                 }, follow_redirects=True)
             else:
-                return self.app.post("/app/new", data={
+                return self.app.post("/project/new", data={
                     'name': name,
                     'short_name': short_name,
                     'description': description,
@@ -120,25 +120,25 @@ class Helper(object):
                     'long_description': long_description,
                 }, follow_redirects=True)
         else:
-            return self.app.get("/app/new", follow_redirects=True)
+            return self.app.get("/project/new", follow_redirects=True)
 
-    def new_task(self, appid):
-        """Helper function to create tasks for an app"""
+    def new_task(self, projectid):
+        """Helper function to create tasks for an project"""
         tasks = []
         for i in range(0, 10):
-            tasks.append(model.Task(app_id=appid, state='0', info={}))
+            tasks.append(model.Task(project_id=projectid, state='0', info={}))
         db.session.add_all(tasks)
         db.session.commit()
 
-    def delTaskRuns(self, app_id=1):
-        """Deletes all TaskRuns for a given app_id"""
-        db.session.query(model.TaskRun).filter_by(app_id=1).delete()
+    def delTaskRuns(self, project_id=1):
+        """Deletes all TaskRuns for a given project_id"""
+        db.session.query(model.TaskRun).filter_by(project_id=1).delete()
         db.session.commit()
 
-    def task_settings_scheduler(self, method="POST", short_name='sampleapp',
+    def task_settings_scheduler(self, method="POST", short_name='sampleproject',
                                 sched="default"):
         """Helper function to modify task scheduler"""
-        url = "/app/%s/tasks/scheduler" % short_name
+        url = "/project/%s/tasks/scheduler" % short_name
         if method == "POST":
             return self.app.post(url, data={
                 'sched': sched,
@@ -146,10 +146,10 @@ class Helper(object):
         else:
             return self.app.get(url, follow_redirects=True)
 
-    def task_settings_redundancy(self, method="POST", short_name='sampleapp',
+    def task_settings_redundancy(self, method="POST", short_name='sampleproject',
                                  n_answers=30):
         """Helper function to modify task redundancy"""
-        url = "/app/%s/tasks/redundancy" % short_name
+        url = "/project/%s/tasks/redundancy" % short_name
         if method == "POST":
             return self.app.post(url, data={
                 'n_answers': n_answers,
@@ -157,17 +157,17 @@ class Helper(object):
         else:
             return self.app.get(url, follow_redirects=True)
 
-    def delete_application(self, method="POST", short_name="sampleapp"):
-        """Helper function to create an application"""
+    def delete_project(self, method="POST", short_name="sampleproject"):
+        """Helper function to create an project"""
         if method == "POST":
-            return self.app.post("/app/%s/delete" % short_name,
+            return self.app.post("/project/%s/delete" % short_name,
                                  follow_redirects=True)
         else:
-            return self.app.get("/app/%s/delete" % short_name,
+            return self.app.get("/project/%s/delete" % short_name,
                                 follow_redirects=True)
 
-    def update_application(self, method="POST", short_name="sampleapp", id=1,
-                           new_name="Sample App", new_short_name="sampleapp",
+    def update_project(self, method="POST", short_name="sampleproject", id=1,
+                           new_name="Sample Project", new_short_name="sampleproject",
                            new_description="Description",
                            new_thumbnail="New Icon link",
                            new_allow_anonymous_contributors="False",
@@ -175,10 +175,10 @@ class Helper(object):
                            new_long_description="Long desc",
                            new_sched="random",
                            new_hidden=False):
-        """Helper function to create an application"""
+        """Helper function to create an project"""
         if method == "POST":
             if new_hidden:
-                return self.app.post("/app/%s/update" % short_name,
+                return self.app.post("/project/%s/update" % short_name,
                                      data={
                                          'id': id,
                                          'name': new_name,
@@ -192,7 +192,7 @@ class Helper(object):
                                          'hidden': new_hidden},
                                      follow_redirects=True)
             else:
-                return self.app.post("/app/%s/update" % short_name,
+                return self.app.post("/project/%s/update" % short_name,
                                      data={'id': id, 'name': new_name,
                                            'short_name': new_short_name,
                                            'thumbnail': new_thumbnail,
@@ -203,5 +203,5 @@ class Helper(object):
                                            'description': new_description},
                                      follow_redirects=True)
         else:
-            return self.app.get("/app/%s/update" % short_name,
+            return self.app.get("/project/%s/update" % short_name,
                                 follow_redirects=True)
