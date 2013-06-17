@@ -59,7 +59,7 @@ class TestAPI:
     def test_00_limits_query(self):
         """Test API GET limits works"""
         for i in range(30):
-            app = model.Project(name="name%s" % i,
+            project = model.Project(name="name%s" % i,
                             short_name="short_name%s" % i,
                             description="desc",
                             owner_id=1)
@@ -99,7 +99,7 @@ class TestAPI:
         res = self.app.get('/api/app')
         data = json.loads(res.data)
         assert len(data) == 1, data
-        app = data[0]
+        project = data[0]
         assert app['info']['total'] == 150, data
 
         # The output should have a mime-type: application/json
@@ -114,7 +114,7 @@ class TestAPI:
 
             if endpoint == 'app':
                 assert len(data) == 1, data
-                app = data[0]
+                project = data[0]
                 assert app['info']['total'] == 150, data
                 # The output should have a mime-type: application/json
                 assert res.mimetype == 'application/json', res
@@ -562,7 +562,7 @@ class TestAPI:
         user = db.session.query(model.User)\
                  .filter_by(name=Fixtures.name)\
                  .one()
-        app = db.session.query(model.Project)\
+        project = db.session.query(model.Project)\
                 .filter_by(owner_id=user.id)\
                 .one()
         data = dict(project_id=app.id, state='0', info='my task data')
@@ -747,7 +747,7 @@ class TestAPI:
 
     def test_06_taskrun_post(self):
         """Test API TaskRun creation and auth"""
-        app = db.session.query(model.Project)\
+        project = db.session.query(model.Project)\
                 .filter_by(short_name=Fixtures.app_short_name)\
                 .one()
         tasks = db.session.query(model.Task)\
@@ -936,7 +936,7 @@ class TestAPI:
 
     def test_taskrun_newtask(self):
         """Test API Project.new_task method and authentication"""
-        app = db.session.query(model.Project)\
+        project = db.session.query(model.Project)\
                 .filter_by(short_name=Fixtures.app_short_name)\
                 .one()
 
@@ -978,7 +978,7 @@ class TestAPI:
     def test_07_user_progress_anonymous(self):
         """Test API userprogress as anonymous works"""
         self.signout()
-        app = db.session.query(model.Project).get(1)
+        project = db.session.query(model.Project).get(1)
         tasks = db.session.query(model.Task)\
                   .filter(model.Task.project_id == app.id)\
                   .all()
@@ -1023,7 +1023,7 @@ class TestAPI:
         user = db.session.query(model.User)\
                  .filter(model.User.name == 'johndoe')\
                  .first()
-        app = db.session.query(model.Project)\
+        project = db.session.query(model.Project)\
                 .get(1)
         tasks = db.session.query(model.Task)\
                   .filter(model.Task.project_id == app.id)\
@@ -1101,7 +1101,7 @@ class TestAPI:
 
     def test_11_allow_anonymous_contributors(self):
         """Test API allow anonymous contributors works"""
-        app = db.session.query(model.Project).first()
+        project = db.session.query(model.Project).first()
 
         # All users are allowed to participate by default
         # As Anonymous user
