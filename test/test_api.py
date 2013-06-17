@@ -1142,7 +1142,7 @@ class TestAPI:
         print task
         assert task['app_id'] is None, err_msg
         err_msg = "There should be an error message"
-        err = "This application does not allow anonymous contributors"
+        err = "This project does not allow anonymous contributors"
         assert task['info'].get('error') == err, err_msg
         err_msg = "There should not be a question"
         assert task['info'].get('question') is None, err_msg
