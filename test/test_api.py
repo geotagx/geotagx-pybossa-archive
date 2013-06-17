@@ -419,7 +419,7 @@ class TestAPI:
         error = json.loads(res.data)
         assert error['status'] == 'failed', error
         assert error['action'] == 'DELETE', error
-        assert error['target'] == 'app', error
+        assert error['target'] == 'project', error
         ### real user but not allowed as not owner!
         url = '/api/project/%s?api_key=%s' % (id_, Fixtures.api_key_2)
         res = self.app.delete(url, data=datajson)
@@ -428,7 +428,7 @@ class TestAPI:
         error = json.loads(res.data)
         assert error['status'] == 'failed', error
         assert error['action'] == 'DELETE', error
-        assert error['target'] == 'app', error
+        assert error['target'] == 'project', error
 
         url = '/api/project/%s?api_key=%s' % (id_, Fixtures.api_key)
         res = self.app.delete(url, data=datajson)
@@ -442,7 +442,7 @@ class TestAPI:
         assert res.status_code == 404, error
         assert error['status'] == 'failed', error
         assert error['action'] == 'DELETE', error
-        assert error['target'] == 'app', error
+        assert error['target'] == 'project', error
         assert error['exception_cls'] == 'NotFound', error
 
         # delete an app that does not exist
