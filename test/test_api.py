@@ -748,7 +748,7 @@ class TestAPI:
     def test_06_taskrun_post(self):
         """Test API TaskRun creation and auth"""
         project = db.session.query(model.Project)\
-                .filter_by(short_name=Fixtures.app_short_name)\
+                .filter_by(short_name=Fixtures.project_short_name)\
                 .one()
         tasks = db.session.query(model.Task)\
                   .filter_by(project_id=project.id)
@@ -937,7 +937,7 @@ class TestAPI:
     def test_taskrun_newtask(self):
         """Test API Project.new_task method and authentication"""
         project = db.session.query(model.Project)\
-                .filter_by(short_name=Fixtures.app_short_name)\
+                .filter_by(short_name=Fixtures.project_short_name)\
                 .one()
 
         # anonymous
