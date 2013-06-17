@@ -989,7 +989,8 @@ class TestAPI:
                      .filter(model.TaskRun.user_id == 2)\
                      .all()
 
-        res = self.app.get('/api/project/1/userprogress', follow_redirects=True)
+        url = '/api/project/%s/userprogress' % project.short_name
+        res = self.app.get(url, follow_redirects=True)
         data = json.loads(res.data)
 
         error_msg = "The reported total number of tasks is wrong"
@@ -1130,8 +1131,8 @@ class TestAPI:
         self.signout()
 
         # Now only allow authenticated users
-        app.allow_anonymous_contributors = False
-        db.session.add(app)
+        project.allow_anonymous_contributors = False
+        db.session.add(project)
         db.session.commit()
 
         # As Anonymous user

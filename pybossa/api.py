@@ -283,7 +283,8 @@ def new_task(project_id):
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')
-@blueprint.route('/project/<short_name>/userprogress')
+@blueprint.route('/project/<string:short_name>/userprogress')
+@blueprint.route('/project/<int:project_id>/userprogress')
 @crossdomain(origin='*', headers=cors_headers)
 def user_progress(project_id=None, short_name=None):
     """Return a JSON object with two fields regarding the tasks for the user:
@@ -298,6 +299,8 @@ def user_progress(project_id=None, short_name=None):
             project = db.session.query(model.Project)\
                     .filter(model.Project.short_name == short_name)\
                     .first()
+            print short_name
+            print project
         if project_id:
             project = db.session.query(model.Project)\
                     .get(project_id)
