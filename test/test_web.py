@@ -1804,7 +1804,7 @@ class TestWeb(web.Helper):
         # As owner
         self.register(fullname="owner", username="owner")
         self.new_project()
-        url = "/project/%s/tasks/settings" % self.app_short_name
+        url = "/project/%s/tasks/settings" % self.project_short_name
 
         res = self.app.get(url, follow_redirects=True)
         dom = BeautifulSoup(res.data)
@@ -1844,7 +1844,7 @@ class TestWeb(web.Helper):
         # Create owner
         self.register(fullname="owner", username="owner")
         self.new_project()
-        url = "/project/%s/tasks/scheduler" % self.app_short_name
+        url = "/project/%s/tasks/scheduler" % self.project_short_name
         form_id = 'task_scheduler'
         self.signout()
 
@@ -1863,7 +1863,7 @@ class TestWeb(web.Helper):
             dom = BeautifulSoup(res.data)
             err_msg = "There should be a %s section" % form_id
             assert dom.find(id=form_id) is not None, err_msg
-            res = self.task_settings_scheduler(short_name=self.app_short_name,
+            res = self.task_settings_scheduler(short_name=self.project_short_name,
                                                sched=sched)
             dom = BeautifulSoup(res.data)
             err_msg = "Task Scheduler should be updated"
@@ -1894,7 +1894,7 @@ class TestWeb(web.Helper):
         self.register(fullname="owner", username="owner")
         self.new_project()
         self.new_task(1)
-        url = "/project/%s/tasks/redundancy" % self.app_short_name
+        url = "/project/%s/tasks/redundancy" % self.project_short_name
         form_id = 'task_redundancy'
         self.signout()
 
@@ -1914,7 +1914,7 @@ class TestWeb(web.Helper):
             # Correct values
             err_msg = "There should be a %s section" % form_id
             assert dom.find(id=form_id) is not None, err_msg
-            res = self.task_settings_redundancy(short_name=self.app_short_name,
+            res = self.task_settings_redundancy(short_name=self.project_short_name,
                                                 n_answers=n_answers)
             dom = BeautifulSoup(res.data)
             err_msg = "Task Redundancy should be updated"
@@ -1923,12 +1923,12 @@ class TestWeb(web.Helper):
             for t in app.tasks:
                 assert t.n_answers == n_answers, err_msg
             # Wrong values, triggering the validators
-            res = self.task_settings_redundancy(short_name=self.app_short_name,
+            res = self.task_settings_redundancy(short_name=self.project_short_name,
                                                 n_answers=0)
             dom = BeautifulSoup(res.data)
             err_msg = "Task Redundancy should be a value between 0 and 1000"
             assert dom.find(id='msg_error') is not None, err_msg
-            res = self.task_settings_redundancy(short_name=self.app_short_name,
+            res = self.task_settings_redundancy(short_name=self.project_short_name,
                                                 n_answers=10000000)
             dom = BeautifulSoup(res.data)
             err_msg = "Task Redundancy should be a value between 0 and 1000"
