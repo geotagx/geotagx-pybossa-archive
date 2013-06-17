@@ -9,7 +9,7 @@ class TestAPI:
         self.app = web.app.test_client()
         model.rebuild_db()
         Fixtures.create()
-        self.endpoints = ['app', 'task', 'taskrun']
+        self.endpoints = ['project', 'task', 'taskrun']
 
     def tearDown(self):
         db.session.remove()
