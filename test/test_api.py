@@ -59,7 +59,7 @@ class TestAPI:
     def test_00_limits_query(self):
         """Test API GET limits works"""
         for i in range(30):
-            app = model.App(name="name%s" % i,
+            app = model.Project(name="name%s" % i,
                             short_name="short_name%s" % i,
                             description="desc",
                             owner_id=1)
@@ -95,7 +95,7 @@ class TestAPI:
         assert len(data) == 20, len(data)
 
     def test_01_app_query(self):
-        """ Test API App query"""
+        """ Test API Project query"""
         res = self.app.get('/api/app')
         data = json.loads(res.data)
         assert len(data) == 1, data
@@ -184,13 +184,13 @@ class TestAPI:
         assert len(data) == 0, data
 
         # Multiple fields
-        res = self.app.get('/api/app?short_name=test-app&name=My New App')
+        res = self.app.get('/api/app?short_name=test-app&name=My New Project')
         data = json.loads(res.data)
         # One result
         assert len(data) == 1, data
         # Correct result
         assert data[0]['short_name'] == 'test-app', data
-        assert data[0]['name'] == 'My New App', data
+        assert data[0]['name'] == 'My New Project', data
 
         # Limits
         res = self.app.get("/api/taskrun?app_id=1&limit=5")
@@ -288,7 +288,7 @@ class TestAPI:
         assert res.mimetype == 'application/json', res
 
     def test_04_app_post(self):
-        """Test API App creation and auth"""
+        """Test API Project creation and auth"""
         name = u'XXXX Project'
         data = dict(
             name=name,
@@ -303,7 +303,7 @@ class TestAPI:
         # now a real user
         res = self.app.post('/api/app?api_key=' + Fixtures.api_key,
                             data=data)
-        out = db.session.query(model.App).filter_by(name=name).one()
+        out = db.session.query(model.Project).filter_by(name=name).one()
         assert out, out
         assert_equal(out.short_name, 'xxxx-project'), out
         assert_equal(out.owner.name, 'tester')
@@ -367,7 +367,7 @@ class TestAPI:
                            data=datajson)
 
         assert_equal(res.status, '200 OK', res.data)
-        out2 = db.session.query(model.App).get(id_)
+        out2 = db.session.query(model.Project).get(id_)
         assert_equal(out2.name, data['name'])
         out = json.loads(res.data)
         assert out.get('status') is None, error
@@ -451,7 +451,7 @@ class TestAPI:
         assert res.status_code == 404, error
 
     def test_04_admin_app_post(self):
-        """Test API App update/delete for ADMIN users"""
+        """Test API Project update/delete for ADMIN users"""
         name = u'XXXX Project'
         data = dict(
             name=name,
@@ -463,7 +463,7 @@ class TestAPI:
         res = self.app.post('/api/app?api_key=' + Fixtures.api_key_2,
                             data=datajson)
 
-        out = db.session.query(model.App).filter_by(name=name).one()
+        out = db.session.query(model.Project).filter_by(name=name).one()
         assert out, out
         assert_equal(out.short_name, 'xxxx-project'), out
         assert_equal(out.owner.name, 'tester-2')
@@ -510,7 +510,7 @@ class TestAPI:
         res = self.app.put(url, data=datajson)
 
         assert_equal(res.status, '200 OK', res.data)
-        out2 = db.session.query(model.App).get(id_)
+        out2 = db.session.query(model.Project).get(id_)
         assert_equal(out2.name, data['name'])
 
         # PUT with not JSON data
@@ -562,7 +562,7 @@ class TestAPI:
         user = db.session.query(model.User)\
                  .filter_by(name=Fixtures.name)\
                  .one()
-        app = db.session.query(model.App)\
+        app = db.session.query(model.Project)\
                 .filter_by(owner_id=user.id)\
                 .one()
         data = dict(app_id=app.id, state='0', info='my task data')
@@ -747,7 +747,7 @@ class TestAPI:
 
     def test_06_taskrun_post(self):
         """Test API TaskRun creation and auth"""
-        app = db.session.query(model.App)\
+        app = db.session.query(model.Project)\
                 .filter_by(short_name=Fixtures.app_short_name)\
                 .one()
         tasks = db.session.query(model.Task)\
@@ -935,8 +935,8 @@ class TestAPI:
         assert_equal(res.status, '204 NO CONTENT', error_msg)
 
     def test_taskrun_newtask(self):
-        """Test API App.new_task method and authentication"""
-        app = db.session.query(model.App)\
+        """Test API Project.new_task method and authentication"""
+        app = db.session.query(model.Project)\
                 .filter_by(short_name=Fixtures.app_short_name)\
                 .one()
 
@@ -978,7 +978,7 @@ class TestAPI:
     def test_07_user_progress_anonymous(self):
         """Test API userprogress as anonymous works"""
         self.signout()
-        app = db.session.query(model.App).get(1)
+        app = db.session.query(model.Project).get(1)
         tasks = db.session.query(model.Task)\
                   .filter(model.Task.app_id == app.id)\
                   .all()
@@ -1023,7 +1023,7 @@ class TestAPI:
         user = db.session.query(model.User)\
                  .filter(model.User.name == 'johndoe')\
                  .first()
-        app = db.session.query(model.App)\
+        app = db.session.query(model.Project)\
                 .get(1)
         tasks = db.session.query(model.Task)\
                   .filter(model.Task.app_id == app.id)\
@@ -1101,7 +1101,7 @@ class TestAPI:
 
     def test_11_allow_anonymous_contributors(self):
         """Test API allow anonymous contributors works"""
-        app = db.session.query(model.App).first()
+        app = db.session.query(model.Project).first()
 
         # All users are allowed to participate by default
         # As Anonymous user
