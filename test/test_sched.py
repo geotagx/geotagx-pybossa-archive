@@ -10,7 +10,7 @@ class TestSched(sched.Helper):
     def setUp(self):
         super(TestSched, self).setUp()
         Fixtures.create()
-        self.endpoints = ['app', 'task', 'taskrun']
+        self.endpoints = ['project', 'task', 'taskrun']
 
     # Tests
     def test_anonymous_01_newtask(self):
@@ -18,7 +18,7 @@ class TestSched(sched.Helper):
         # Del previous TaskRuns
         self.del_task_runs()
 
-        res = self.app.get('api/app/1/newtask')
+        res = self.app.get('api/project/1/newtask')
         data = json.loads(res.data)
         assert data['info'], data
 
@@ -29,7 +29,7 @@ class TestSched(sched.Helper):
 
         assigned_tasks = []
         # Get a Task until scheduler returns None
-        res = self.app.get('api/app/1/newtask')
+        res = self.app.get('api/project/1/newtask')
         data = json.loads(res.data)
         while data.get('info') is not None:
             # Check that we have received a Task
@@ -39,19 +39,19 @@ class TestSched(sched.Helper):
             assigned_tasks.append(data)
 
             # Submit an Answer for the assigned task
-            tr = model.TaskRun(app_id=data['app_id'], task_id=data['id'],
+            tr = model.TaskRun(project_id=data['project_id'], task_id=data['id'],
                                user_ip="127.0.0.1",
                                info={'answer': 'Yes'})
             db.session.add(tr)
             db.session.commit()
-            res = self.app.get('api/app/1/newtask')
+            res = self.app.get('api/project/1/newtask')
             data = json.loads(res.data)
 
         # Check if we received the same number of tasks that the available ones
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         assert len(assigned_tasks) == len(tasks), len(assigned_tasks)
         # Check if all the assigned Task.id are equal to the available ones
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         err_msg = "Assigned Task not found in DB Tasks"
         for at in assigned_tasks:
             assert self.is_task(at['id'], tasks), err_msg
@@ -68,7 +68,7 @@ class TestSched(sched.Helper):
         assigned_tasks = []
         # Get Task until scheduler returns None
         for i in range(10):
-            res = self.app.get('api/app/1/newtask')
+            res = self.app.get('api/project/1/newtask')
             data = json.loads(res.data)
 
             while data.get('info') is not None:
@@ -79,16 +79,16 @@ class TestSched(sched.Helper):
                 assigned_tasks.append(data)
 
                 # Submit an Answer for the assigned task
-                tr = model.TaskRun(app_id=data['app_id'], task_id=data['id'],
+                tr = model.TaskRun(project_id=data['project_id'], task_id=data['id'],
                                    user_ip="127.0.0." + str(i),
                                    info={'answer': 'Yes'})
                 db.session.add(tr)
                 db.session.commit()
-                res = self.app.get('api/app/1/newtask')
+                res = self.app.get('api/project/1/newtask')
                 data = json.loads(res.data)
 
         # Check if there are 30 TaskRuns per Task
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         for t in tasks:
             assert len(t.task_runs) == 10, len(t.task_runs)
         # Check that all the answers are from different IPs
@@ -105,7 +105,7 @@ class TestSched(sched.Helper):
         # Register
         self.register()
         self.signin()
-        res = self.app.get('api/app/1/newtask')
+        res = self.app.get('api/project/1/newtask')
         data = json.loads(res.data)
         assert data['info'], data
         self.signout()
@@ -121,7 +121,7 @@ class TestSched(sched.Helper):
 
         assigned_tasks = []
         # Get Task until scheduler returns None
-        res = self.app.get('api/app/1/newtask')
+        res = self.app.get('api/project/1/newtask')
         data = json.loads(res.data)
         while data.get('info') is not None:
             # Check that we received a Task
@@ -131,19 +131,19 @@ class TestSched(sched.Helper):
             assigned_tasks.append(data)
 
             # Submit an Answer for the assigned task
-            tr = dict(app_id=data['app_id'], task_id=data['id'],
+            tr = dict(project_id=data['project_id'], task_id=data['id'],
                       info={'answer': 'No'})
             tr = json.dumps(tr)
 
             self.app.post('/api/taskrun', data=tr)
-            res = self.app.get('api/app/1/newtask')
+            res = self.app.get('api/project/1/newtask')
             data = json.loads(res.data)
 
         # Check if we received the same number of tasks that the available ones
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         assert len(assigned_tasks) == len(tasks), assigned_tasks
         # Check if all the assigned Task.id are equal to the available ones
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         err_msg = "Assigned Task not found in DB Tasks"
         for at in assigned_tasks:
             assert self.is_task(at['id'], tasks), err_msg
@@ -167,7 +167,7 @@ class TestSched(sched.Helper):
             print "Giving answers as User: %s" % self.user.username + str(i)
             self.signin()
             # Get Task until scheduler returns None
-            res = self.app.get('api/app/1/newtask')
+            res = self.app.get('api/project/1/newtask')
             data = json.loads(res.data)
 
             while data.get('info') is not None:
@@ -178,17 +178,17 @@ class TestSched(sched.Helper):
                 assigned_tasks.append(data)
 
                 # Submit an Answer for the assigned task
-                tr = dict(app_id=data['app_id'], task_id=data['id'],
+                tr = dict(project_id=data['project_id'], task_id=data['id'],
                           info={'answer': 'No'})
                 tr = json.dumps(tr)
                 self.app.post('/api/taskrun', data=tr)
 
-                res = self.app.get('api/app/1/newtask')
+                res = self.app.get('api/project/1/newtask')
                 data = json.loads(res.data)
             self.signout()
 
         # Check if there are 30 TaskRuns per Task
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         for t in tasks:
             print len(t.task_runs)
             assert len(t.task_runs) == 10, t.task_runs
@@ -225,7 +225,7 @@ class TestSched(sched.Helper):
             if signin:
                 self.signin()
             # Get Task until scheduler returns None
-            res = self.app.get('api/app/1/newtask')
+            res = self.app.get('api/project/1/newtask')
             data = json.loads(res.data)
 
             while data.get('info') is not None:
@@ -237,24 +237,24 @@ class TestSched(sched.Helper):
 
                 # Submit an Answer for the assigned task
                 if signin:
-                    tr = dict(app_id=data['app_id'], task_id=data['id'],
+                    tr = dict(project_id=data['project_id'], task_id=data['id'],
                               info={'answer': 'No'})
                     tr = json.dumps(tr)
                     self.app.post('/api/taskrun', data=tr)
                 else:
-                    tr = model.TaskRun(app_id=data['app_id'], task_id=data['id'],
+                    tr = model.TaskRun(project_id=data['project_id'], task_id=data['id'],
                                        user_ip="127.0.0." + str(i),
                                        info={'answer': 'Yes'})
                     db.session.add(tr)
                     db.session.commit()
 
-                res = self.app.get('api/app/1/newtask')
+                res = self.app.get('api/project/1/newtask')
                 data = json.loads(res.data)
             if signin:
                 self.signout()
 
         # Check if there are 30 TaskRuns per Task
-        tasks = db.session.query(model.Task).filter_by(app_id=1).all()
+        tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         for t in tasks:
             print len(t.task_runs)
             assert len(t.task_runs) == 10, t.task_runs
@@ -279,12 +279,12 @@ class TestSched(sched.Helper):
 
         assigned_tasks = []
         # Get Task until scheduler returns None
-        res = self.app.get('api/app/1/newtask')
+        res = self.app.get('api/project/1/newtask')
         task1 = json.loads(res.data)
         # Check that we received a Task
         assert task1.get('info'),  task1
         # Pre-load the next task for the user
-        res = self.app.get('api/app/1/newtask?offset=1')
+        res = self.app.get('api/project/1/newtask?offset=1')
         task2 = json.loads(res.data)
         # Check that we received a Task
         assert task2.get('info'),  task2
@@ -296,17 +296,17 @@ class TestSched(sched.Helper):
 
         # Submit an Answer for the assigned and pre-loaded task
         for t in assigned_tasks:
-            tr = dict(app_id=t['app_id'], task_id=t['id'], info={'answer': 'No'})
+            tr = dict(project_id=t['project_id'], task_id=t['id'], info={'answer': 'No'})
             tr = json.dumps(tr)
 
             self.app.post('/api/taskrun', data=tr)
         # Get two tasks again
-        res = self.app.get('api/app/1/newtask')
+        res = self.app.get('api/project/1/newtask')
         task3 = json.loads(res.data)
         # Check that we received a Task
         assert task3.get('info'),  task1
         # Pre-load the next task for the user
-        res = self.app.get('api/app/1/newtask?offset=1')
+        res = self.app.get('api/project/1/newtask?offset=1')
         task4 = json.loads(res.data)
         # Check that we received a Task
         assert task4.get('info'),  task2
@@ -315,7 +315,7 @@ class TestSched(sched.Helper):
         assert task1.get('id') != task3.get('id'), "Tasks should be different"
         assert task2.get('id') != task4.get('id'), "Tasks should be different"
         # Check that a big offset returns None
-        res = self.app.get('api/app/1/newtask?offset=11')
+        res = self.app.get('api/project/1/newtask?offset=11')
         print json.loads(res.data)
         assert json.loads(res.data) == {}, res.data
 
@@ -328,9 +328,9 @@ class TestGetBreadthFirst:
     def tearDown(self):
         db.session.remove()
 
-    def del_task_runs(self, app_id=1):
-        """Deletes all TaskRuns for a given app_id"""
-        db.session.query(model.TaskRun).filter_by(app_id=1).delete()
+    def del_task_runs(self, project_id=1):
+        """Deletes all TaskRuns for a given project_id"""
+        db.session.query(model.TaskRun).filter_by(project_id=1).delete()
         db.session.commit()
         db.session.remove()
 
@@ -347,40 +347,40 @@ class TestGetBreadthFirst:
             short_name = 'xyzuser'
         else:
             short_name = 'xyznouser'
-        app = model.App(short_name=short_name)
-        task = model.Task(app=app, state='0', info={})
-        task2 = model.Task(app=app, state='0', info={})
-        db.session.add(app)
+        project = model.Project(short_name=short_name)
+        task = model.Task(project=project, state='0', info={})
+        task2 = model.Task(project=project, state='0', info={})
+        db.session.add(project)
         db.session.add(task)
         db.session.add(task2)
         db.session.commit()
         taskid = task.id
-        appid = app.id
+        projectid = project.id
         # give task2 a bunch of runs
         for idx in range(2):
             self._add_task_run(task2)
 
         # now check we get task without task runs
-        out = pybossa.sched.get_breadth_first_task(appid)
+        out = pybossa.sched.get_breadth_first_task(projectid)
         assert out.id == taskid, out
 
         # now check that offset works
-        out1 = pybossa.sched.get_breadth_first_task(appid)
-        out2 = pybossa.sched.get_breadth_first_task(appid, offset=1)
+        out1 = pybossa.sched.get_breadth_first_task(projectid)
+        out2 = pybossa.sched.get_breadth_first_task(projectid, offset=1)
         assert out1.id != out2.id, out
 
         # asking for a bigger offset (max 10)
-        out2 = pybossa.sched.get_breadth_first_task(appid, offset=11)
+        out2 = pybossa.sched.get_breadth_first_task(projectid, offset=11)
         assert out2 is None, out
 
         self._add_task_run(task)
-        out = pybossa.sched.get_breadth_first_task(appid)
+        out = pybossa.sched.get_breadth_first_task(projectid)
         assert out.id == taskid, out
 
         # now add 2 more taskruns. We now have 3 and 2 task runs per task
         self._add_task_run(task)
         self._add_task_run(task)
-        out = pybossa.sched.get_breadth_first_task(appid)
+        out = pybossa.sched.get_breadth_first_task(projectid)
         assert out.id == task2.id, out
 
     def _add_task_run(self, task, user=None):
