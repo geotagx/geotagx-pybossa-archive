@@ -346,14 +346,14 @@ class TestAdmin(web.Helper):
         tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         assert len(tasks) > 0, "len(app.tasks) > 0"
         res = self.signin(email=u'root@root.com', password=u'tester' + 'root')
-        res = self.app.get('/app/test-app/tasks/delete', follow_redirects=True)
+        res = self.app.get('/project/test-project/tasks/delete', follow_redirects=True)
         err_msg = "Admin user should get 200 in GET"
         assert res.status_code == 200, err_msg
-        res = self.app.post('/app/test-app/tasks/delete', follow_redirects=True)
+        res = self.app.post('/project/test-project/tasks/delete', follow_redirects=True)
         err_msg = "Admin should get 200 in POST"
         assert res.status_code == 200, err_msg
         tasks = db.session.query(model.Task).filter_by(project_id=1).all()
-        assert len(tasks) == 0, "len(app.tasks) != 0"
+        assert len(tasks) == 0, "len(project.tasks) != 0"
 
     def test_19_admin_list_categories(self):
         """Test ADMIN list categories works"""
