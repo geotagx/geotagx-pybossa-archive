@@ -69,7 +69,7 @@ class TestAdmin(web.Helper):
         self.register()
         self.signin()
         res = self.app.get('/admin/featured', follow_redirects=True)
-        assert "Manage featured applications" in res.data, res.data
+        assert "Manage featured projects" in res.data, res.data
 
     def test_04_admin_featured_apps_as_anonymous(self):
         """Test ADMIN featured apps works as an anonymous user"""
@@ -89,11 +89,11 @@ class TestAdmin(web.Helper):
     def test_06_admin_featured_apps_add_remove_app(self):
         """Test ADMIN featured apps add-remove works as an admin user"""
         self.register()
-        self.new_application()
-        # The application is in the system but not in the front page
+        self.new_project()
+        # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
         assert "Create an App" in res.data,\
-            "The application should not be listed in the front page"\
+            "The project should not be listed in the front page"\
             " as it is not featured"
         # Only apps that have been published can be featured
         self.new_task(1)
@@ -112,7 +112,7 @@ class TestAdmin(web.Helper):
         # Check that it is listed in the front page
         res = self.app.get('/', follow_redirects=True)
         assert "Sample App" in res.data,\
-            "The application should be listed in the front page"\
+            "The project should be listed in the front page"\
             " as it is featured"
         # Remove it again from the Featured list
         res = self.app.delete('/admin/featured/1')
@@ -120,7 +120,7 @@ class TestAdmin(web.Helper):
         # Check that it is not listed in the front page
         res = self.app.get('/', follow_redirects=True)
         assert "Sample App" not in res.data,\
-            "The application should not be listed in the front page"\
+            "The project should not be listed in the front page"\
             " as it is not featured"
 
     def test_07_admin_featured_apps_add_remove_app_non_admin(self):
@@ -129,10 +129,10 @@ class TestAdmin(web.Helper):
         self.signout()
         self.register(username="John2", email="john2@john.com",
                       password="passwd")
-        self.new_application()
-        # The application is in the system but not in the front page
+        self.new_project()
+        # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
-        err_msg = ("The application should not be listed in the front page"
+        err_msg = ("The project should not be listed in the front page"
                    "as it is not featured")
         assert "Create an App" in res.data, err_msg
         res = self.app.get('/admin/featured', follow_redirects=True)
@@ -153,12 +153,12 @@ class TestAdmin(web.Helper):
     def test_08_admin_featured_apps_add_remove_app_anonymous(self):
         """Test ADMIN featured apps add-remove works as an anonymous user"""
         self.register()
-        self.new_application()
+        self.new_project()
         self.signout()
-        # The application is in the system but not in the front page
+        # The project is in the system but not in the front page
         res = self.app.get('/', follow_redirects=True)
         assert "Create an App" in res.data,\
-            "The application should not be listed in the front page"\
+            "The project should not be listed in the front page"\
             " as it is not featured"
         res = self.app.get('/admin/featured', follow_redirects=True)
         err_msg = ("The user should not be able to access this page"
@@ -301,17 +301,17 @@ class TestAdmin(web.Helper):
         self.signout()
         self.register(fullname="Juan Jose", username="juan",
                       email="juan@juan.com", password="juan")
-        self.new_application()
+        self.new_project()
         self.signout()
         # Sign in with the root user
         self.signin()
         res = self.app.get('/app/sampleapp/settings')
         err_msg = "Admin users should be able to get the settings page for any app"
         assert res.status == "200 OK", err_msg
-        res = self.update_application(method="GET")
-        assert "Update the application" in res.data,\
+        res = self.update_project(method="GET")
+        assert "Update the project" in res.data,\
             "The app should be updated by admin users"
-        res = self.update_application(new_name="Root",
+        res = self.update_project(new_name="Root",
                                       new_short_name="rootsampleapp")
         res = self.app.get('/app/rootsampleapp', follow_redirects=True)
         assert "Root" in res.data, "The app should be updated by admin users"
@@ -328,16 +328,16 @@ class TestAdmin(web.Helper):
         self.signout()
         self.register(fullname="Juan Jose", username="juan",
                       email="juan@juan.com", password="juan")
-        self.new_application()
+        self.new_project()
         self.signout()
         # Sign in with the root user
         self.signin()
-        res = self.delete_application(method="GET")
+        res = self.delete_project(method="GET")
         assert "Yes, delete it" in res.data,\
             "The app should be deleted by admin users"
-        res = self.delete_application()
+        res = self.delete_project()
         err_msg = "The app should be deleted by admin users"
-        assert "Application deleted!" in res.data, err_msg
+        assert "Project deleted!" in res.data, err_msg
 
     def test_18_admin_delete_tasks(self):
         """Test ADMIN can delete an app's tasks that belongs to another user"""
