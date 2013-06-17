@@ -221,6 +221,20 @@ def redirect_old_app(short_name):
 def redirect_old_app_tasks(short_name):
     return redirect(url_for("project.tasks", short_name=short_name), 301)
 
+@app.route('/app/<short_name>/tasks/delete', methods=['GET', 'POST'])
+def redirect_old_app_tasks_delete(short_name):
+    return redirect(url_for("project.delete_tasks", short_name=short_name), 301)
+
+
+@app.route('/app/<short_name>/tasks/export')
+def redirect_old_app_tasks_delete(short_name):
+    return redirect(url_for("project.export_to", short_name=short_name), 301)
+
+
+@app.route('/app/<short_name>/stats')
+def redirect_old_app_stats(short_name):
+    return redirect(url_for("project.show_stats", short_name=short_name), 301)
+
 
 @app.route('/app/<short_name>/tasks/browse', defaults={'page': 1})
 @app.route('/app/<short_name>/tasks/browse/<int:page>')
