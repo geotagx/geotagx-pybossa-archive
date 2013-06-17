@@ -76,12 +76,12 @@ class TestAPI:
         data = json.loads(res.data)
         assert len(data) == 20, len(data)
 
-        res = self.app.get('/api/app?limit=10')
+        res = self.app.get('/api/project?limit=10')
         data = json.loads(res.data)
         print data
         assert len(data) == 10, len(data)
 
-        res = self.app.get('/api/app?limit=10&offset=10')
+        res = self.app.get('/api/project?limit=10&offset=10')
         data = json.loads(res.data)
         assert len(data) == 10, len(data)
         assert data[0].get('name') == 'name9'
@@ -171,7 +171,7 @@ class TestAPI:
     def test_query_app(self):
         """Test API query for app endpoint works"""
         # Test for real field
-        res = self.app.get("/api/app?short_name=test-app")
+        res = self.app.get("/api/project?short_name=test-app")
         data = json.loads(res.data)
         # Should return one result
         assert len(data) == 1, data
@@ -179,12 +179,12 @@ class TestAPI:
         assert data[0]['short_name'] == 'test-app', data
 
         # Valid field but wrong value
-        res = self.app.get("/api/app?short_name=wrongvalue")
+        res = self.app.get("/api/project?short_name=wrongvalue")
         data = json.loads(res.data)
         assert len(data) == 0, data
 
         # Multiple fields
-        res = self.app.get('/api/app?short_name=test-app&name=My New Project')
+        res = self.app.get('/api/project?short_name=test-app&name=My New Project')
         data = json.loads(res.data)
         # One result
         assert len(data) == 1, data
@@ -301,7 +301,7 @@ class TestAPI:
         assert_equal(res.status, '403 FORBIDDEN',
                      'Should not be allowed to create')
         # now a real user
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key,
                             data=data)
         out = db.session.query(model.Project).filter_by(name=name).one()
         assert out, out
@@ -311,7 +311,7 @@ class TestAPI:
         db.session.remove()
 
         # test re-create should fail
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key,
                             data=data)
         err = json.loads(res.data)
         assert res.status_code == 415, err
@@ -321,7 +321,7 @@ class TestAPI:
 
         # test create with non-allowed fields should fail
         data = dict(name='fail', short_name='fail', link='hateoas', wrong=15)
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key,
                             data=data)
         err = json.loads(res.data)
         err_msg = "ValueError exception should be raised"
@@ -331,7 +331,7 @@ class TestAPI:
         assert err['exception_cls'] == "ValueError", err_msg
         # Now with a JSON object but not valid
         data = json.dumps(data)
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key,
                             data=data)
         err = json.loads(res.data)
         err_msg = "TypeError exception should be raised"
@@ -460,7 +460,7 @@ class TestAPI:
                                Long Description</div>')
         datajson = json.dumps(data)
         # now a real user (we use the second api_key as first user is an admin)
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key_2,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key_2,
                             data=datajson)
 
         out = db.session.query(model.Project).filter_by(name=name).one()
@@ -471,7 +471,7 @@ class TestAPI:
         db.session.remove()
 
         # POST with not JSON data
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key_2,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key_2,
                             data=data)
         err = json.loads(res.data)
         assert res.status_code == 415, err
@@ -481,7 +481,7 @@ class TestAPI:
         assert err['exception_cls'] == 'ValueError', err
 
         # POST with not allowed args
-        res = self.app.post('/api/app?api_key=%s&foo=bar' % Fixtures.api_key_2,
+        res = self.app.post('/api/project?api_key=%s&foo=bar' % Fixtures.api_key_2,
                             data=data)
         err = json.loads(res.data)
         assert res.status_code == 415, err
@@ -492,7 +492,7 @@ class TestAPI:
 
         # POST with fake data
         data['wrongfield'] = 13
-        res = self.app.post('/api/app?api_key=' + Fixtures.api_key_2,
+        res = self.app.post('/api/project?api_key=' + Fixtures.api_key_2,
                             data=json.dumps(data))
         err = json.loads(res.data)
         assert res.status_code == 415, err
