@@ -868,7 +868,7 @@ class TestWeb(web.Helper):
         self.new_project()
         self.signout()
 
-        res = self.app.get('/app/sampleproject', follow_redirects=True)
+        res = self.app.get('/project/sampleproject', follow_redirects=True)
         print res.data
         assert "Sample Project" in res.data, ("Project name should be shown"
                                           " to users")
@@ -1618,7 +1618,7 @@ class TestWeb(web.Helper):
         # Owner
         tasks = db.session.query(model.Task).filter_by(project_id=1).all()
         res = self.signin(email=u'tester@tester.com', password=u'tester')
-        res = self.app.get('/app/test-project/tasks/delete', follow_redirects=True)
+        res = self.app.get('/project/test-project/tasks/delete', follow_redirects=True)
         err_msg = "Owner user should get 200 in GET"
         assert res.status == '200 OK', err_msg
         assert len(tasks) > 0, "len(project.tasks) > 0"
