@@ -9,7 +9,7 @@ Flask-Mail
 python-dateutil
 alembic
 psycopg2
-requests
+requests==2.0.0
 itsdangerous
 markdown
 raven
