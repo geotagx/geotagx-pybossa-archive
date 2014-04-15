@@ -43,8 +43,9 @@ from flaskext.wtf import Form, TextField, PasswordField, validators, \
 import pybossa.validator as pb_validator
 import pybossa.model as model
 from flask.ext.babel import lazy_gettext, gettext
-#from sqlalchemy.sql import func, text
-from sqlalchemy.sql import text
+from sqlalchemy.exc import UnboundExecutionError
+from sqlalchemy.sql import func, text
+from sqlalchemy import func
 from pybossa.model.user import User
 from pybossa.core import db, signer, mail, get_locale
 from pybossa.util import Pagination
@@ -66,6 +67,49 @@ def index(page):
     Returns a Jinja2 rendered template with the users.
 
     """
+
+    # Leaderboard code. See leaderboard.py
+    # Top 20 users
+    limit = 20
+    sql = text('''
+               WITH global_rank AS (
+                    WITH scores AS (
+                        SELECT user_id, COUNT(*) AS score FROM task_run
+                        WHERE user_id IS NOT NULL GROUP BY user_id)
+                    SELECT user_id, score, rank() OVER (ORDER BY score desc)
+                    FROM scores)
+               SELECT rank, id, name, fullname, email_addr, score FROM global_rank
+               JOIN public."user" on (user_id=public."user".id) ORDER BY rank
+               LIMIT :limit;
+               ''')
+
+    results = db.engine.execute(sql, limit=20)
+
+    top_users = []
+    user_in_top = False
+    if current_user.is_authenticated():
+        for user in results:
+            if (user.id == current_user.id):
+                user_in_top = True
+            top_users.append(user)
+        if not user_in_top:
+            sql = text('''
+                       WITH global_rank AS (
+                            WITH scores AS (
+                                SELECT user_id, COUNT(*) AS score FROM task_run
+                                WHERE user_id IS NOT NULL GROUP BY user_id)
+                            SELECT user_id, score, rank() OVER (ORDER BY score desc)
+                            FROM scores)
+                       SELECT rank, id, name, fullname, email_addr, score FROM global_rank
+                       JOIN public."user" on (user_id=public."user".id)
+                       WHERE user_id=:user_id ORDER BY rank;
+                       ''')
+            user_rank = db.engine.execute(sql, user_id=current_user.id)
+            for row in user_rank: # pragma: no cover
+                top_users.append(row)
+    else:
+        top_users = results
+
     per_page = 24
     count = cached_users.get_total_users()
     accounts = cached_users.get_users_page(page, per_page)
@@ -74,7 +118,8 @@ def index(page):
     pagination = Pagination(page, per_page, count)
     return render_template('account/index.html', accounts=accounts,
                            total=count,
-                           title="Community", pagination=pagination)
+                           title="Community", pagination=pagination,
+                           top_users=top_users)
 
 
 class LoginForm(Form):
