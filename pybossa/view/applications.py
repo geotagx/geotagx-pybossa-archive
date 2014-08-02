@@ -107,7 +107,8 @@ class TaskSchedulerForm(Form):
                         choices=[('default', lazy_gettext('Default')),
                                  ('breadth_first', lazy_gettext('Breadth First')),
                                  ('depth_first', lazy_gettext('Depth First')),
-                                 ('random', lazy_gettext('Random'))],)
+                                 ('random', lazy_gettext('Random')),
+								 ('filter_by_users', lazy_gettext('Filtered by Users'))],)
 
 
 def app_title(app, page_name):
@@ -159,6 +160,7 @@ def redirect_old_draft(page):
 @blueprint.route('/category/featured/page/<int:page>/')
 def index(page):
     """List apps in the system"""
+    return redirect(url_for('home'))
     if cached_apps.n_featured() > 0:
         return app_index(page, cached_apps.get_featured, 'featured',
                          True, False)
@@ -174,20 +176,44 @@ def index(page):
                 cat_short_name = "algo"
         return redirect(url_for('.app_cat_index', category=cat_short_name))
 
+def get_app_category(app_short_name):
+    """Return the category short_name of the application"""
 
+
+    sql = text('''
+               SELECT category.short_name FROM app
+               LEFT OUTER JOIN category ON app.category_id=category.id
+               WHERE
+               app.short_name=:app_s_n;''')
+
+
+    results = db.engine.execute(sql, app_s_n=app_short_name)
+
+    for row in results:
+		return row.short_name;
+		
 def app_index(page, lookup, category, fallback, use_count):
     """Show apps of app_type"""
 
     per_page = 5
+    # @FC to come back to project homepage from the application detail
+    if 'cat_byapp_' in category:
+        category = get_app_category(category.replace("cat_byapp_", ""))
 
+    # @FC
     apps, count = lookup(category, page, per_page)
 
     data = []
+    #for app in apps:
+    #    if 'tutorial' in app['short_name']:
+    #        data.append(dict(app=app, n_tasks=cached_apps.n_tasks(app['id']),
+    #                         overall_progress=cached_apps.overall_progress(app['id']),
+    #                         last_activity=cached_apps.last_activity(app['id'])))
     for app in apps:
-        data.append(dict(app=app, n_tasks=cached_apps.n_tasks(app['id']),
-                         overall_progress=cached_apps.overall_progress(app['id']),
-                         last_activity=cached_apps.last_activity(app['id'])))
-
+        if 'tutorial' not in app['short_name']:
+            data.append(dict(app=app, n_tasks=cached_apps.n_tasks(app['id']),
+                             overall_progress=cached_apps.overall_progress(app['id']),
+                             last_activity=cached_apps.last_activity(app['id'])))
 
     if fallback and not apps:
         return redirect(url_for('.published'))
@@ -216,8 +242,13 @@ def app_index(page, lookup, category, fallback, use_count):
         "title": gettext("Applications"),
         "pagination": pagination,
         "active_cat": active_cat,
+        "n_apps_per_category": None,
         "categories": categories}
 
+    n_apps_per_category = dict()
+    for c in categories:
+        n_apps_per_category[c.short_name] = cached_apps.n_count(c.short_name)
+    template_args['n_apps_per_category'] = n_apps_per_category
     if use_count:
         template_args.update({"count": count})
     return render_template('/applications/index.html', **template_args)
@@ -242,6 +273,7 @@ def app_cat_index(category, page):
 
 @blueprint.route('/new', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def new():
     if not require.app.create():
         abort(403)
@@ -292,13 +324,14 @@ def new():
     return redirect(url_for('.settings', short_name=app.short_name))
 
 
+
 @blueprint.route('/<short_name>/tasks/taskpresentereditor', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def task_presenter_editor(short_name):
     try:
         errors = False
         app, n_tasks, n_task_runs, overall_progress, last_activty = app_by_shortname(short_name)
-
         title = app_title(app, "Task Presenter Editor")
         require.app.read(app)
         require.app.update(app)
@@ -367,6 +400,7 @@ def task_presenter_editor(short_name):
 
 @blueprint.route('/<short_name>/delete', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def delete(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     try:
@@ -397,6 +431,7 @@ def delete(short_name):
 
 @blueprint.route('/<short_name>/update', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def update(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
 
@@ -502,6 +537,7 @@ def details(short_name):
 
 @blueprint.route('/<short_name>/settings')
 @login_required
+@admin_required
 def settings(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
 
@@ -543,6 +579,7 @@ def compute_importer_variant_pairs(forms):
 
 @blueprint.route('/<short_name>/tasks/import', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def import_task(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     title = app_title(app, "Import Tasks")
@@ -746,6 +783,8 @@ def presenter(short_name):
 
 
 @blueprint.route('/<short_name>/tutorial')
+@login_required
+@admin_required
 def tutorial(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     title = app_title(app, "Tutorial")
@@ -760,6 +799,8 @@ def tutorial(short_name):
 
 
 @blueprint.route('/<short_name>/<int:task_id>/results.json')
+@login_required
+@admin_required
 def export(short_name, task_id):
     """Return a file with all the TaskRuns for a give Task"""
     # Check if the app exists
@@ -785,6 +826,8 @@ def export(short_name, task_id):
 
 
 @blueprint.route('/<short_name>/tasks/')
+@login_required
+@admin_required
 def tasks(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     title = app_title(app, "Tasks")
@@ -805,6 +848,8 @@ def tasks(short_name):
 
 @blueprint.route('/<short_name>/tasks/browse', defaults={'page': 1})
 @blueprint.route('/<short_name>/tasks/browse/<int:page>')
+@login_required
+@admin_required
 def tasks_browse(short_name, page):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     title = app_title(app, "Tasks")
@@ -843,6 +888,7 @@ def tasks_browse(short_name, page):
 
 @blueprint.route('/<short_name>/tasks/delete', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def delete_tasks(short_name):
     """Delete ALL the tasks for a given application"""
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
@@ -874,6 +920,8 @@ def delete_tasks(short_name):
 
 
 @blueprint.route('/<short_name>/tasks/export')
+@login_required
+@admin_required
 def export_to(short_name):
     """Export Tasks and TaskRuns in the given format"""
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
@@ -1070,6 +1118,8 @@ def export_to(short_name):
 
 
 @blueprint.route('/<short_name>/stats')
+@login_required
+@admin_required
 def show_stats(short_name):
     """Returns App Stats"""
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
@@ -1121,6 +1171,7 @@ def show_stats(short_name):
 
 @blueprint.route('/<short_name>/tasks/settings')
 @login_required
+@admin_required
 def task_settings(short_name):
     """Settings page for tasks of the application"""
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
@@ -1170,6 +1221,7 @@ def task_n_answers(short_name):
 
 @blueprint.route('/<short_name>/tasks/scheduler', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def task_scheduler(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     title = app_title(app, gettext('Task Scheduler'))
@@ -1214,6 +1266,7 @@ def task_scheduler(short_name):
 
 @blueprint.route('/<short_name>/tasks/priority', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def task_priority(short_name):
     app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     title = app_title(app, gettext('Task Priority'))

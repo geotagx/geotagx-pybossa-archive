@@ -1,38 +1,23 @@
     <div class="row">
-        <div class="span11">
+        <div class="col-sm-12">
             <h1>{{ _('About') }}</h1>
-            <p>
-            {{ _('PyBossa is a free, open-source crowd-sourcing and micro-tasking platform. It enables people to create and run projects that utilise online assistance in performing tasks that require human cognition such as image classification, transcription, geocoding and more. PyBossa is there to help researchers, civic hackers and developers to create projects where anyone around the world with some time, interest and an internet connection can contribute.') }}</p>
+         <p><strong>The GeoTag-X pilot project</strong> will teach volunteers to perform in-depth analyses of the media (photos, video, and audio) coming out of a disaster. </p>
+<p>Disaster response efforts have to analyse massive amounts of data that are produced during a crisis, an overwhelmingly difficult task. Crowd-sourcing has already been used during different events to help filter, categorise, and map this data, and has proved to be an invaluable resource.</p>
+</div>
+ <div class="col-sm-12">
+<p>
 
-            <p>
-            {{ _('PyBossa is different to existing efforts:') }}
-            <ul>
-                <li>{{ _("It's a 100%% open-source") }}</li>
-                <li>{{ _('Unlike, say, “mechanical turk” style projects, PyBossa is not designed to handle payment or money — it is designed to support volunteer-driven projects.') }}
-                </li>
-                <li>{{ _("It's designed as a platform and framework for developing deploying crowd-sourcing and microtasking apps rather than being a crowd-sourcing application itself. Individual crowd-sourcing apps are written as simple snippets of Javascript and HTML which are then deployed on a PyBossa instance (such as") }}  <a href="http://crowdcrafting.org">CrowdCrafting.org</a>). {{ _('This way one can easily develop custom apps while using the PyBossa platform to store your data, manage users, and handle workflow') }}.</li>
-            </ul> 
-            </p>
+We want to teach you, our volunteers, to recognise the important information in a photo and create relevant, structured datasets that can be used by those working on the ground in the response.<br>
+Disasters could include earthquakes, floods, and hurricanes, along with more slow moving events such as drought, climate change, and pollution. Analyses therefore could cover topics as diverse as environmental conditions, health, agriculture, and engineering. <br>
+<br><strong>How do I get started?</strong><br>
+There are two ways you can volunteer for Geotag-X<br>
+1) <a href="{{url_for('find_photos')}}">Find Photos</a> <br>
+2) <a href="{{url_for('analyse_photos')}}">Analyse Photos</a>  <br>
+<br><strong>More about Geotag-X</strong><br>
+Geotag-X is developed by the <a  target="_blank" href="www.unitar.org/unosat">United Nations Institute for Training and Research’s Operational Satellite Applications Programme (UNITAR/UNOSAT)</a> and is part of the <a  target="_blank" href="http://citizencyberlab.eu/">Citizen Cyberlab</a> project.<br>
+Geotag-X is powered by <a  target="_blank" href=" http://docs.pybossa.com"> Pybossa </a>, an open source platform for crowd-sourcing tasks
 
-            <p>
-            {{ _('You can read more about the architecture in the') }} <a href="http://docs.pybossa.com/">{{ _('PyBossa Documentation') }}</a> {{ _('and follow the') }} <a href="http://docs.pybossa.com/en/latest/user/tutorial.html">{{ _('step-by-step tutorial to create your own apps') }}.</a>.
-            </p>
 
-            <h1>{{ _('Statistics') }}</h1>
-            <p>
-           {{ _(' PyBossa provides individual statistics for every application in the system, as well as a') }} <a href="{{url_for('stats.index')}}">{{ _('general overview about the system like total number of users, tasks, etc') }}</a>. 
-            </p>
-            <a href="{{url_for('stats.index')}}" class="btn btn-primary"><i class="icon-dashboard"></i> {{ _('Check the global statistics') }}</a>
-
-            <h1 id="contact">{{ _('Contact information') }}</h1>
-            <ul>
-                <li>{{ _('For more info, send us an e-mail to: ') }}<a href="mailto:info@pybossa.com">info@pybossa.com</a> or <a class="btn" href="http://twitter.com/pybossa"><i class="icon-twitter"></i>{{ _('Follow us on Twitter!') }}</a></li>
-                <li>{{ _('E-mail list: ') }}<a href="http://lists.okfn.org/mailman/listinfo/okfn-labs">okfn-labs@lists.okfn.org</a>.</li>                
-                <li><p>{{ _('Report any bug, issue or improvement:') }} 
-                    <a class="btn" href="http://github.com/PyBossa/pybossa/issues">
-                        <i class="icon-github"></i>{{ _('Github Issues') }}
-                    </a>
-                    </li>            
-            </ul>
+</p>
         </div>
     </div>

@@ -1,44 +1,71 @@
-    <div class="navbar navbar-fixed-top">
-      <div class="navbar-inner">
+<div class="navbar navbar-default navbar-fixed-top ">
+
         <div class="container">
-          <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+		<div class="navbar-header">
+          <a href="{{ url_for('home') }}" class="navbar-brand"><img src="{{url_for('static',filename='img/' + logo)}}" alt="{{brand}}"></a>
+          <button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#navbar-main">
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
-          </a>
-          <a class="brand" href="{{ url_for('home') }}"><img src="{{url_for('static',filename='img/' + logo)}}" alt="{{brand}}"></a>
-          <div class="nav-collapse collapse">
-            <ul class="nav">
-              <li {% if active_page == 'community' %} class="active" {% endif %}><a href="{{ url_for('account.index')}}">{{ _('Community') }}</a></li>
-              <li {% if active_page == 'applications' %} class="active" {% endif %}><a href="{{ url_for('app.index') }}">{{ _('Applications') }}</a></li>
-              <li {% if active_page == 'create' %} class="active" {% endif %}><a href="{{ url_for('app.new') }}">{{ _('Create') }}</a></li>
+          </button>
+        </div>
+          
+          <div class="navbar-collapse collapse " id="navbar-main">
+		  <p style="margin:0;padding:0;margin-top: -23px;margin-left: -17px;" class="navbar-form form-search pull-left"><strong>Beta version 1.1</strong></p>
+           <ul class="nav navbar-nav ">
+              <!--<li {% if active_page == 'community' %} class="active" {% endif %}><a href="{{ url_for('account.index')}}">{{ _('Community') }}</a></li>-->
+              <li {% if active_page == 'applications' %} class="active" {% endif %}><a href="{{ url_for('app.index') }}">{{ _('Projects') }}</a></li>
+              {% if current_user.admin == 1 %}
+			  <li {% if active_page == 'create' %} class="active" {% endif %}><a href="{{ url_for('app.new') }}">{{ _('Create') }}</a></li>
+			  {% endif %}
+			  <!--<li {% if active_page == 'learn_more' %} class="active" {% endif %}><a href="{{ url_for('about')}}">{{ _('Learn More') }}</a></li>
+			  <!--<li {% if active_page == 'test' %} class="active" {% endif %}><a href="{{ url_for('about')}}">{{ _('Test Your Skill') }}</a></li>
+			  <li {% if active_page == 'forum' %} class="active" {% endif %}><a href="{{ url_for('about')}}">{{ _('Forum') }}</a></li>-->
               <li {% if active_page == 'about' %} class="active" {% endif %}><a href="{{ url_for('about')}}">{{ _('About') }}</a></li>
+			  
             </ul>
-            {% include '_gcs_form.html' ignore missing %}
+			
+           <!-- <form class="navbar-form form-search pull-right" action="/search">
+      <input type="hidden" name="cx" value="XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:YYYYYYYYYYY"/>
+      <input type="hidden" name="cof" value="FORID:10" />
+      <input type="hidden" name="ie" value="ISO-8859-1" />
+      <div class="input-append">
+      <input type="text" name="q" class="col-sm-2 search-query" placeholder="{{_('Search')}}"  />
+      <button class="btn" type="submit"><i class="icon-search"></i></button>
+      </div>
+</form> -->
           {% if current_user.is_authenticated() %}
-            <ul class="nav secondary-nav pull-right">
-              <li {% if active_page == 'profile' %} class="active" {% endif %}><a href="#" data-toggle="dropdown" class="dropdown-toggle"><i class="icon icon-user"></i> {{ current_user.name | truncate(6,true) }} <span class="caret"></span></a>
-                <ul class="dropdown-menu">
-                    <li><a href="{{ url_for('account.profile') }}"><i class="icon icon-user"></i> {{ _('My Profile') }}</a></li>
-                    <li><a href="{{ url_for('account.applications') }}"><i class="icon icon-th-large"></i> {{ _('My Applications') }}</a></li>
-                    <li><a href="{{ url_for('account.settings') }}"><i class="icon icon-cog"></i> {{ _('My Settings') }}</a></li>
+             <ul class="nav navbar-nav navbar-right">
+              <li {% if active_page == 'profile' %} class="active" {% endif %}><a href="#" data-toggle="dropdown" id="profile" class="dropdown-toggle"><i class="fa fa-user"></i> {{ current_user.name | truncate(6,true) }} <span class="caret"></span></a>
+                <ul class="dropdown-menu" aria-labelledby="profile">
+                    <li><a href="{{ url_for('account.profile') }}"><i class="fa fa-user"></i> {{ _('My Profile') }}</a></li>
+                    <li><a href="{{ url_for('account.applications') }}"><i class="fa fa-th-large"></i> {{ _('My Applications') }}</a></li>
+                    <li><a href="{{ url_for('account.settings') }}"><i class="fa fa-cog"></i> {{ _('My Settings') }}</a></li>
                     {% if current_user.admin == 1 %}
                     <li class="divider"></li>
-                    <li><a href="{{ url_for('admin.index') }}"><i class="icon icon-cog"></i> {{ _('Admin Site') }}</a></li>
+                    <li><a href="{{ url_for('admin.index') }}"><i class="fa fa-cog"></i> {{ _('Admin Site') }}</a></li>
                     {% endif %}
                     <li class="divider"></li>
-                  <li><a href="{{ url_for('account.signout') }}"><i class="icon icon-off"></i> {{ _('Sign Out') }}</a></li>
+                  <li><a href="{{ url_for('account.signout') }}"><i class="fa fa-sign-out"></i> {{ _('Sign Out') }}</a></li>
                 </ul>
               </li>
             </ul>
           {% endif %}
-
+	 
             {% if current_user.is_anonymous() %}
-            <ul class="nav secondary-nav pull-right">
-              <li><a href="{{ url_for('account.signin') }}"><i class="icon icon-white icon-signin"></i> {{ _('Sign in') }}</a></li>
+             <ul class="nav navbar-nav navbar-right">
+			 {% if current_user.is_authenticated()==false %}
+
+      <li class="alert alert-warning">
+           
+          Hey! You are an anonymous user. Sign in now!
+        </li>
+
+			   {% endif %}
+              <li><a href="{{ url_for('account.signin') }}"><i class="fa fa-white fa-sign-in"></i> {{ _('Sign in') }}</a></li>
             </ul>
             {% endif %}
           </div><!--/.nav-collapse -->
         </div>
-      </div>
+
     </div>

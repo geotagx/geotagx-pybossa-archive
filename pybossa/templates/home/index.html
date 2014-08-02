@@ -1,7 +1,149 @@
 {% extends "base.html" %}
 
 {% block content %}
-      <div class="banner">
+		<div class="row">
+			<div class="col-sm-12 text-center" style="display:none;">
+			
+					<div id="carousel-home" class="carousel slide" data-ride="carousel">
+
+
+						  <!-- Wrapper for slides -->
+						  <div class="carousel-inner">
+							<div class="item active">
+							<div class="col-xs-2 col-xs-offset-1 text-center">
+							<strong class="str_number">1</strong>
+							</div>
+							<div class="col-xs-7  text-justify"><p class="vertical-align" > The <strong>GeoTag-X</strong> pilot project will teach volunteers to perform more in-depth analyses of the 
+
+						media (photos, video, and audio) coming out of a disaster, analyses that would usually require 
+
+						expert skills or experience. <strong >Anyone can become a volunteer.</strong> Download the Firefox plugin and 
+
+						send us relevant pictures that you find as you browse the internet, or become a part of the 
+
+						community by creating an account on this website. </p></div>
+							
+							
+							</div>
+						   <div class="item">
+							<div class="col-xs-2 col-xs-offset-1 text-center">
+							<strong class="str_number text-center">2</strong>
+							</div>
+						<div class="col-xs-7  text-justify"><p class="vertical-align" >
+						On this website you will find <strong>applications</strong> covering a variety of different topics being deployed 
+
+						for different projects that <strong>UNOSAT</strong> is working on. We are still developing and testing these 
+
+						applications, right now they are all in demo mode, but <strong >we really need feedback from volunteers</strong> 
+
+						to help us improve them and make them operational.</p></div>
+							
+							
+							</div>
+							<div class="item">
+							 <div class="col-xs-2 col-xs-offset-1 text-center">
+							<strong class="str_number">3</strong>
+							</div>
+							 <div class="col-xs-7  text-justify"><p class="vertical-align" >
+						<strong >To get started is easy!</strong> Just click on one of the projects below. Within each project you will find a 
+
+						series of applications, pick one and begin contributing! <strong>You can provide feedback</strong> by clicking on 
+
+						"feedback" and filling in the form.</p></div>
+						 
+						 
+							</div>
+						  </div>
+
+						  <!-- Controls -->
+						  <a class="left carousel-control" href="#carousel-home" data-slide="prev">
+							<span class="fa fa-chevron-left"></span>
+						  </a>
+						  <a class="right carousel-control" href="#carousel-home" data-slide="next">
+							<span class="fa fa-chevron-right"></span>
+						  </a>
+					</div>
+
+
+			</div>
+		</div>
+		
+		
+		
+		<!--<hr class="hr15">
+		<br>-->
+		<div class="col-sm-12 text-center">
+				<!--<h2 style="font-size: 43px;" >Get Started! Choose a project ...</h2>-->
+			</div>
+		{% if categories %}
+			{% for c in categories %}
+				{% if ((loop.index is divisibleby 4) or loop.index==1) %}
+				<div class="row">
+				{% endif %}
+					<div class="col-sm-4 homepage_progetti_div">
+						
+						<div class="panel panel-default">
+							<div class="panel-heading text-center">
+								<a data-toggle="tooltip" data-placement="bottom" title="Let's go Contribute!" class="link_heading_homepage" href="{{url_for('app.app_cat_index', category=c.short_name)}}"><h3 class="panel-title"><strong >{{c.name}}</strong> &nbsp;<i class="fa fa-arrow-circle-right"></i></h3></a>
+							</div>
+							{% if apps[c.short_name] %}
+										{% for app_base in apps[c.short_name] %}
+											{% if app_base.info.thumbnail %}
+												<div class="panel-body panel-body-homepage" style="background:url({{ app_base.info.thumbnail }}) no-repeat center center; background-size:cover;">
+											{% else %}
+												<div class="panel-body panel-body-homepage" style="background:url({{url_for('static', filename='img/placeholder.dark.png')}}) no-repeat center center; background-size:cover;">
+											{% endif %}
+										{% endfor %}
+									{% else %}
+											<div class="panel-body panel-body-homepage" style="background:url({{url_for('static', filename='img/placeholder.dark.png')}}) no-repeat center center; background-size:cover;">
+									{% endif %}
+							
+								<a class="a_cat_homepage" href="{{url_for('app.app_cat_index', category=c.short_name)}}"></a>
+								
+							</div>
+							<div class="panel-footer">
+								<div class="row">
+								<h4 class="inline hideoverflow_text col-xs-12">{{c.description}}</h4>
+									<ul class="nav nav-pills">
+										<li class=" pull-right">
+											<a href="{{url_for('app.app_cat_index', category=c.short_name)}}">Projects <span class="badge">{{ n_apps_per_category[c.short_name]}}</span></a>
+										</li>
+									</ul>
+								</div>
+							</div>
+						</div>
+						
+					</div>
+			
+				{% if ((loop.index is divisibleby 3)) %}
+				</div>
+				{% endif %}
+				
+			{% endfor %}
+		{% endif %}
+		
+		<hr class="hr15">
+		<br>
+		
+		
+		<div class="row" >
+			<div class="col-sm-12 jumbotron homepage_jumbo text-center">
+				
+				<h2 style="font-size: 43px;" >Get more info:</h2>
+				<div class="col-sm-5 text-center">
+					<a class="btn btn-lg btn-primary" href="{{ url_for('find_photos')}}"> FIND PHOTOS </a>
+				</div>
+				<div class="col-sm-2 text-center">
+					<p><br>or</p>
+				</div>
+				<div class="col-sm-5 text-center">
+					<a class="btn btn-lg btn-success"  href="{{ url_for('analyse_photos')}}"> ANALYSE PHOTOS </a>
+				</div>
+				
+			</div>
+		</div>
+		
+    <!--
         <div class="row">
           <div class="span4">
               <h1>{{ brand }}</h1>
@@ -27,8 +169,8 @@
             </ul>
           </div>
         </div>
-      </div>
-
+     -->
+<!--
       <section class="grey get-started">
         <div class="row">
           <div class="span4">
@@ -39,7 +181,8 @@
               <a href="{{url_for('app.index')}}" class="btn btn-info btn-large"><i class="icon-ok-sign"></i>{{ _(' Start Contributing') }}</a> <a href="{{url_for('app.new')}}" class="btn btn-primary btn-large"><i class="icon-plus-sign"></i> {{ _('Create an App') }}</a>
           </div>
       </section>
-      
+      -->
+	  <!--
       <section>
         <h2><i class="icon-th"></i>{{ _('Most Active Applications') }}</h2>
         <div class="row">
@@ -69,7 +212,8 @@
           {% endfor %}
         </div>
       </section>
-      
+      -->
+	  <!--
       {% if top_users %}
       <section id="top_users" class="grey">
         <h2><i class="icon-group"></i>{{ _('Most Active Volunteers') }}</h2>
@@ -89,6 +233,7 @@
         </ul>
       </section>
       {% endif %}
+	  -->
 <script>
 $("a[rel=popover]").popover({
         html: true,
@@ -96,5 +241,14 @@ $("a[rel=popover]").popover({
         trigger: 'hover',
         placement: 'top'
                 });
+				$("*[data-toggle=tooltip]").tooltip();
+				
+				$("*[data-toggle=popover]").popover();
+				$("#carousel-home").carousel({
+					interval: false,
+					wrap: true
+				});
+
+				
 </script>
 {% endblock %}

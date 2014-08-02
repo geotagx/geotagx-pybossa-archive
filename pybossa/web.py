@@ -20,6 +20,9 @@ import os
 import logging
 import json
 import os
+# FC addon
+import urllib2
+import json
 
 from flask import Response, request, g, render_template,\
         abort, flash, redirect, session, url_for
@@ -41,8 +44,12 @@ from pybossa.view.stats import blueprint as stats
 from pybossa.view.help import blueprint as help
 from pybossa.cache import apps as cached_apps
 from pybossa.cache import users as cached_users
+from pybossa.cache import categories as cached_cat
 from pybossa.ratelimit import get_view_rate_limit
 
+##unosat addon
+from pybossa.model import User
+from sqlalchemy.sql import text
 
 logger = logging.getLogger('pybossa')
 
@@ -215,13 +222,58 @@ def home():
     """ Render home page with the cached apps and users"""
     d = {'featured': cached_apps.get_featured_front_page(),
          'top_apps': cached_apps.get_top(),
-         'top_users': None}
+         'top_users': None,
+         'categories': None,
+         'apps': None,
+         'n_apps_per_category': None}
 
     if app.config['ENFORCE_PRIVACY'] and current_user.is_authenticated():
         if current_user.admin:
             d['top_users'] = cached_users.get_top()
     if not app.config['ENFORCE_PRIVACY']:
         d['top_users'] = cached_users.get_top()
+    # @FC
+    categories = cached_cat.get_all()
+    n_apps_per_category = dict()
+    apps = dict()
+    for c in categories:
+        n_apps_per_category[c.short_name] = cached_apps.n_count(c.short_name)
+        apps[c.short_name],count = cached_apps.get(c.short_name,1,1)
+    d['categories'] = categories
+    d['n_apps_per_category'] = n_apps_per_category
+    d['apps'] = apps
+    # Current user Survey System
+    if current_user.is_authenticated():
+        sql = text('''SELECT COUNT(task_run.id) AS task_run FROM task_run WHERE :cur_user_id=task_run.user_id''')
+        results = db.engine.execute(sql,cur_user_id=current_user.id)
+        for row in results:
+            num_run_task=row.task_run
+    if current_user.is_authenticated() and current_user.survey_check!= "None" and current_user.survey_check == "2":
+        if num_run_task>=30:
+			d['survey_three'] = True
+			new_profile = model.User(id=current_user.id, survey_check="3")
+			db.session.query(model.User).filter(model.User.id == current_user.id).first()
+			db.session.merge(new_profile)
+			db.session.commit()
+			cached_users.delete_user_summary(current_user.name)
+    elif current_user.is_authenticated() and current_user.survey_check!= "None" and current_user.survey_check == "1":
+        if num_run_task>=1:
+			d['survey_two'] = True
+			new_profile = model.User(id=current_user.id, survey_check="2")
+			db.session.query(model.User).filter(model.User.id == current_user.id).first()
+			db.session.merge(new_profile)
+			db.session.commit()
+			cached_users.delete_user_summary(current_user.name)
+    elif current_user.is_authenticated() and current_user.survey_check!= "None" and current_user.survey_check == "0":
+        d['survey_one'] = True
+        new_profile = model.User(id=current_user.id, survey_check="1")
+        db.session.query(model.User).filter(model.User.id == current_user.id).first()
+        db.session.merge(new_profile)
+        db.session.commit()
+        cached_users.delete_user_summary(current_user.name)
+    else:
+        d['survey_one'] = False
+	# @FC
     return render_template('/home/index.html', **d)
 
 
@@ -229,6 +281,97 @@ def home():
 def about():
     """Render the about template"""
     return render_template("/home/about.html")
+
+@app.route("/find_photos")
+def find_photos():
+    """Render the about template"""
+    return render_template("/home/find_photos.html")
+	
+@app.route("/analyse_photos")
+def analyse_photos():
+    """Render the about template"""
+    return render_template("/home/analyse_photos.html")
+
+
+@app.route("/get_flickr_gallery")
+def get_flickr_gallery():
+    #d = {'gallery_url': request.args.get('gallery_url', None) }
+    #d = {'gallery_url': "a"}
+    gallery_url=request.args.get('gallery_url', None)
+    response = urllib2.urlopen('https://api.flickr.com/services/rest/?method=flickr.urls.lookupGallery&api_key=440a683988a7da58f576256cb68bc270&url='+gallery_url+'&format=json&nojsoncallback=1')
+    data = json.load(response)  
+    gallery_id=data['gallery']['id']
+    #print data
+    response2 = urllib2.urlopen('https://api.flickr.com/services/rest/?method=flickr.galleries.getPhotos&api_key=440a683988a7da58f576256cb68bc270&gallery_id='+gallery_id+'&format=json&nojsoncallback=1')
+    photo_data = json.load(response2)
+    #return json.dumps(photo_data)
+    #https://farm{farm-id}.staticflickr.com/{server-id}/{id}_{secret}.jpg _b per immagine grande
+    #d = {'gallery_photos': photo_data['photos']['photo']}
+    #photo_list=photo_data['photos']['photo']
+    #return photo_data['photos']['photo'][0]['id']
+    csv = """"question","url","uri","url_b"
+"""
+    current = 0
+    max=int(photo_data['photos']['total'])
+    while current < max:
+        csv = csv+"""flickr,https://farm"""+str(photo_data['photos']['photo'][current]['farm'])+""".staticflickr.com/"""+str(photo_data['photos']['photo'][current]['server'])+"""/"""+str(photo_data['photos']['photo'][current]['id'])+"""_"""+str(photo_data['photos']['photo'][current]['secret'])+"""_b.jpg,"""+str(gallery_url)+""",https://farm"""+str(photo_data['photos']['photo'][current]['farm'])+""".staticflickr.com/"""+str(photo_data['photos']['photo'][current]['server'])+"""/"""+str(photo_data['photos']['photo'][current]['id'])+"""_"""+str(photo_data['photos']['photo'][current]['secret'])+"""_b.jpg
+"""
+        current +=1
+    #while current < max
+    #    csv = photo_data['photos']['photo'][current]['id']
+    #    current +=1
+    # We need to modify the response, so the first thing we 
+    # need to do is create a response out of the CSV string
+    #ret_res = make_response(json.dumps(photo_data))
+    # This is the key: Set the right header for the response
+    # to be downloaded, instead of just printed on the browser
+    #response.headers["Content-Disposition"] = "attachment; filename=books.csv"
+    #return Response(csv, mimetype="text/csv", content_type="text/csv; name='filename.csv'")
+    return Response(csv, mimetype="text/csv")
+    #return ret_res
+    #return render_template("/home/get_flickr_gallery.html", **d)
+
+@app.route("/add_one_spam")
+def add_one_spam():
+    task_id=request.args.get('task_id', None)
+    query = text(''' UPDATE task SET is_it_spam=is_it_spam+1 WHERE id=:task_id ''')
+    rows = db.engine.execute(query, task_id=task_id)
+    return render_template("/home/about.html")
+
+@app.route("/get_flickr_set")
+def get_flickr_set():
+    #d = {'gallery_url': request.args.get('gallery_url', None) }
+    #d = {'gallery_url': "a"}
+    gallery_id=request.args.get('set_url', None)
+    #print data
+    response2 = urllib2.urlopen('https://api.flickr.com/services/rest/?method=flickr.photosets.getPhotos&api_key=440a683988a7da58f576256cb68bc270&photoset_id='+gallery_id+'&format=json&nojsoncallback=1')
+    photo_data = json.load(response2)
+    #return json.dumps(photo_data)
+    #https://farm{farm-id}.staticflickr.com/{server-id}/{id}_{secret}.jpg _b per immagine grande
+    #d = {'gallery_photos': photo_data['photos']['photo']}
+    #photo_list=photo_data['photos']['photo']
+    #return photo_data['photos']['photo'][0]['id']
+    csv = """"question","url","uri","url_b"
+"""
+    current = 0
+    max=int(photo_data['photoset']['total'])
+    while current < max:
+        csv = csv+"""flickr,https://farm"""+str(photo_data['photoset']['photo'][current]['farm'])+""".staticflickr.com/"""+str(photo_data['photoset']['photo'][current]['server'])+"""/"""+str(photo_data['photoset']['photo'][current]['id'])+"""_"""+str(photo_data['photoset']['photo'][current]['secret'])+"""_b.jpg,http://www.flickr.com,https://farm"""+str(photo_data['photoset']['photo'][current]['farm'])+""".staticflickr.com/"""+str(photo_data['photoset']['photo'][current]['server'])+"""/"""+str(photo_data['photoset']['photo'][current]['id'])+"""_"""+str(photo_data['photoset']['photo'][current]['secret'])+"""_b.jpg
+"""
+        current +=1
+    #while current < max
+    #    csv = photo_data['photos']['photo'][current]['id']
+    #    current +=1
+    # We need to modify the response, so the first thing we 
+    # need to do is create a response out of the CSV string
+    #ret_res = make_response(json.dumps(photo_data))
+    # This is the key: Set the right header for the response
+    # to be downloaded, instead of just printed on the browser
+    #response.headers["Content-Disposition"] = "attachment; filename=books.csv"
+    #return Response(csv, mimetype="text/csv", content_type="text/csv; name='filename.csv'")
+    return Response(csv, mimetype="text/csv")
+    #return ret_res
+    #return render_template("/home/get_flickr_gallery.html", **d)
 
 @app.route("/search")
 def search():

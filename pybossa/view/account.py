@@ -247,9 +247,14 @@ def register():
     # TODO: re-enable csrf
     form = RegisterForm(request.form)
     if request.method == 'POST' and form.validate():
+        if not request.form.get('survey_check', None) == None:
+            survar="0"
+        else:
+            survar="None"
         account = model.User(fullname=form.fullname.data,
                              name=form.username.data,
-                             email_addr=form.email_addr.data)
+                             email_addr=form.email_addr.data,
+                             survey_check=survar)
         account.set_password(form.password.data)
         account.locale = get_locale()
         db.session.add(account)

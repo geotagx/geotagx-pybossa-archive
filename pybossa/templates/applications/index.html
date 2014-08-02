@@ -4,46 +4,143 @@
 {% import "applications/_helpers.html" as helper %}
 
 {% block content %}
+<!--<script src="{{url_for('static', filename='js/vendor/isotope.pkgd.min.js')}}"></script>-->
+<div class="row ">
+	<div class="col-sm-12"  >
+	 {% if current_user.is_authenticated()==false %}
+              <div class="alert-messages">
+
+    
+    
+      
+      <div id="msg_warning" class="alert alert-warning fade in">
+            <a class="close" data-dismiss="alert" href="#">×</a>
+          <span class="lead"><strong>Hey!</strong></span> You are an anonymous user and will not get any credit for your contributions. <span class="lead"><u><a href="{{ url_for('account.signin') }}"><strong>Sign in now!</strong></a></u></span>
+        </div>
+      
+    
+    
+    </div>
+			   {% endif %}
+		<div class="panel panel-primary" >
+
+
+					 <div class="panel-heading" >
+						<div class="row ">
+						  
+							<div class="panel-title col-sm-8"> 
+							
+								{% if active_cat %}
+									<span class="lead "> <strong> {{ active_cat.name }} </strong> </span> 
+								{% endif %}
+							
+								
+							</div>
+							<div class="col-sm-4 text-center"> 
+								{% if active_cat %}
+									<span class="active" style="line-height:27px;"><span class="badge">{{ n_apps_per_category[active_cat.short_name] }}</span> applications available</span>
+								{% endif %}
+							</div>
+					
+					  </div>
+					  </div>
+					  
+					  <div class="panel-body">
+						  <div class="row ">
+							   <div class="col-sm-8"  style="line-height:16px;">{% if active_cat %}
+									{% autoescape off %}{{ active_cat.description }}{% endautoescape %}
+									 {% endif %}
+								</div>
+								
+								<div class="col-sm-4 container_btn text-center btn-group">
+									<a target="_blank" href="http://twitter.com/home?status=Join%20me%20@%20{{url_for('app.app_cat_index', category=active_cat.short_name,_external=True)}}"><button class="btn btn-twitter"><i class="fa fa-twitter"></i></button></a>
+									<a target="_blank" href="http://www.facebook.com/sharer/sharer.php?u={{url_for('app.app_cat_index', category=active_cat.short_name,_external=True)}}"><button class="btn btn-facebook"><i class="fa fa-facebook"></i></button></a>
+									<a target="_blank" href="https://plus.google.com/share?url={{url_for('app.app_cat_index', category=active_cat.short_name,_external=True)}}"><button class="btn btn-google-plus"><i class="fa fa-google-plus"></i></button></a>
+								</div>
+								
+						  </div>
+					  </div>
+		
+		</div>
+	</div>
+</div>
+		
+	
 
 <div class="row">
-    <div class="span3">
+    <!--<div class="col-sm-3">
             <ul data-spy="affix" data-offset-top="200px" class="nav nav-list bs-docs-sidenav affix-top">
                 {% for c in categories %}
                 <li {% if active_cat.short_name==c.short_name%}class="active"{% endif %}><a href="{{url_for('app.app_cat_index', category=c.short_name)}}"><i class="icon-chevron-right"></i> {{ c.name }}</a></li>
                 {% endfor %}
                 {% if current_user.is_authenticated() and current_user.admin %}
-                <li {% if active_cat.short_name=="draft"%}class="active"{% endif %}><a href="{{url_for('app.draft')}}"><i class="icon-chevron-right"></i> {{ _('Draft') }}</a></li>
-                {% endif %}
+               <li {% if active_cat.short_name=="draft"%}class="active"{% endif %}><a href="{{url_for('app.draft')}}"><i class="icon-chevron-right"></i> {{ _('Draft') }}</a></li>
+			   {% endif %}
             </ul>
-    </div>
-    <div class="span9">
-        {% if apps %}
-            {% if active_cat.short_name=="featured"%} 
-            <h1>
-                <i class="icon-star"></i> {{pagination.total_count}} {{ _('Featured Applications') }}
-            </h1>
-            <h2>{{ _('A special selection of the most interesting applications') }}</h2>
-            {% elif active_cat.short_name=='draft' %}
-            <h1>
-                <i class="icon-wrench"></i> {{pagination.total_count}} {{ _('Draft Applications')}}</h1>
-            <h2>{{ _('Work in progress applications') }}</h2>
-            {% else %}
-            <h1>
-                <i class="icon-th"></i> {{pagination.total_count}} {{ active_cat.name }} Applications</h1>
-            <h2>{{ active_cat.description }}</h2>
-            {% endif %}
-            {% for app in apps %}
-            {{ helper.show_app(app, category, current_user) }}
-            {% endfor %}
-            {% if pagination.pages > 1 %}
-                {{ helper.render_pagination(pagination) }}
-            {% endif %}
-        {% else %}
-            <h1>
-                <i class="icon-th"></i> {{pagination.total_count}} {{ active_cat.name }} Applications</h1>
-            <h2>{{_('Sorry, there are no published applications for this category yet')}}</h2>
-        {% endif %}
-    </div>
+    </div>-->
+	<div class="col-sm-12"  >
+		<div class="col-sm-8">
+
+
+			{% if apps %}
+			 
+
+				
+				{% for app in apps %}
+				{{ helper.show_app(app, category, current_user) }}
+				{% endfor %}
+			
+			
+				{% if pagination.pages > 1 %}
+					{{ helper.render_pagination(pagination) }}
+				{% endif %}
+				
+			{% else %}
+				<h2>a{{category}} {{_('Sorry, there are no published applications for this category yet')}}</h2>
+			{% endif %}
+		</div>
+		<div class="col-sm-4">
+			
+				<!-- <ul data-spy="affix" data-offset-top="50px" class="nav nav-list bs-docs-sidenav" >
+					{% for c in categories %}
+					<li {% if active_cat.short_name==c.short_name%}class="active"{% endif %}><a href="{{url_for('app.app_cat_index', category=c.short_name)}}"><i class="fa-chevron-right"></i> {{ c.name }}</a></li>
+					{% endfor %}
+					{% if current_user.is_authenticated() and current_user.admin %}
+				  <li {% if active_cat.short_name=="draft"%}class="active"{% endif %}><a href="{{url_for('app.draft')}}"><i class="icon-chevron-right"></i> {{ _('Draft') }}</a></li>
+					{% endif %}
+				</ul>-->
+				
+		
+					
+				<div class="row col-sm-offset-1 " >
+						<div  id="sidebar" class="alert alert-success affix-top" >
+							<h3 class="inline"><strong><a href="{{url_for('find_photos')}}">{{ _('Help us find photos!') }}</a></strong></h3><br>
+							<span class="">	
+							</span>
+						</div>
+				</div>
+					
+		
+				
+		</div>
+	
+	</div>
 </div>
 {{ helper.broken_image() }}
+<script>
+$( function() {
+  // init Isotope
+
+$('#sidebar').css("width",$('#sidebar').parent().width());
+
+$( window ).resize(function() {
+	$('#sidebar').css("width",$('#sidebar').parent().width());
+
+});
+$('#sidebar').affix({
+    offset: { top: ( ($('#sidebar').offset().top )-100) }
+});
+
+});
+</script>
 {% endblock %}

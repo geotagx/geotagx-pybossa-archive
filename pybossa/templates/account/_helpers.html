@@ -1,4 +1,4 @@
-{% macro render_account_local_nav(current_user, active_link) -%}
+{% macro render_account_local_nav(current_user, active_link) -%} <!--
 <ul data-spy="affix" data-offset-top="200px" class="nav nav-list bs-docs-sidenav affix-top">
     <li {% if active_link=="profile"%}class="active"{% endif %}><a href="{{url_for('account.profile')}}"><i class="icon-chevron-right"></i> {{ _('My Profile') }}</a></li>
     <li {% if active_link=="applications"%}class="active"{% endif %}><a href="{{url_for('account.applications')}}"><i class="icon-chevron-right"></i> {{ _('My Applications') }}</a></li>
@@ -6,7 +6,7 @@
     <li {% if active_link=="admin"%}class="active"{% endif %}><a href="{{url_for('admin.index')}}"><i class="icon-chevron-right"></i> {{ _('Admin Site') }}</a></li>
     {% endif %}
     <li {% if active_link=="settings"%}class="active"{% endif %}><a href="{{url_for('account.settings')}}"><i class="icon-chevron-right"></i> {{ _('My Settings') }}</a></li>
-</ul>
+</ul> -->
 {% endmacro %}
 
 {% macro render_twitter_btn(app) %}
@@ -31,11 +31,11 @@
 
 
 {% macro render_user_profile(user, settings, private=True) %}
-<div class="row-fluid">
-    <div class="span3">
+<div class="row">
+    <div class="col-sm-3">
         <img class="img-polaroid" src="{{ user.email_addr | gravatar(size=164)}}">
     </div>
-    <div class="span9">
+    <div class="col-sm-9">
         <h2><i class="icon-user"></i> {{ _('Nick')}}: <small>{{ user.name }}</small></h2>
         {% if private %}
         <h2><i class="icon-envelope"></i> {{_('E-mail')}}: <small>{{ user.email_addr }}</small></h2>

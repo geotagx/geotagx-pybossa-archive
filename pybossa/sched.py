@@ -38,10 +38,31 @@ def new_task(app_id, user_id=None, user_ip=None, offset=0):
             'breadth_first': get_breadth_first_task,
             'depth_first': get_depth_first_task,
             'random': get_random_task,
-            'incremental': get_incremental_task}
+            'incremental': get_incremental_task,
+			'filter_by_users': get_filtered_by_user_task}
         sched = sched_map.get(app.info.get('sched'), sched_map['default'])
         return sched(app_id, user_id, user_ip, offset=offset)
 
+def new_task2(app_id, user_id=None, user_ip=None, offset=0, son_app_id=0):
+    '''Get a new task by calling the appropriate scheduler function.
+    '''
+    app = db.session.query(model.App).get(app_id)
+    if not app.allow_anonymous_contributors and user_id is None:
+        error = model.Task(info=dict(error="This application does not allow anonymous contributors"))
+        return error
+    else:
+        sched_map = {
+            'default': get_depth_first_task,
+            'breadth_first': get_breadth_first_task,
+            'depth_first': get_depth_first_task,
+            'random': get_random_task,
+            'incremental': get_incremental_task,
+			'filter_by_users': get_filtered_by_user_task}
+        sched = sched_map.get(app.info.get('sched'), sched_map['default'])
+        if app.info.get('sched') == 'filter_by_users':
+            return sched(app_id, user_id, user_ip, offset=offset, son_app_id=son_app_id)
+        else:
+            return sched(app_id, user_id, user_ip, offset=offset)
 
 def get_breadth_first_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0):
     """Gets a new task which have the least number of task runs (excluding the
@@ -197,3 +218,63 @@ def get_candidate_tasks(app_id, user_id=None, user_ip=None, n_answers=30, offset
             if (offset == 0):
                 break
     return candidate_tasks
+	
+def get_filtered_by_user_task(app_id, user_id=None, user_ip=None, n_answers=30, offset=0, son_app_id=0):
+    """Gets all available tasks for a given application and user"""
+    rows = None
+    if user_id and not user_ip:
+        query = text('''
+                     SELECT id,is_it_spam FROM task WHERE NOT EXISTS
+                     (SELECT task_id FROM task_run WHERE
+                     app_id=:app_id AND user_id=:user_id AND task_id=task.id AND info LIKE '%"son_app_id": '''+son_app_id+'''%')
+                     AND app_id=:app_id AND state !='completed'
+                     ORDER BY priority_0 DESC, id ASC LIMIT 10''')
+        rows = db.engine.execute(query, app_id=app_id, user_id=user_id)
+    else:
+        if not user_ip:
+            user_ip = '127.0.0.1'
+        query = text('''
+                     SELECT id,is_it_spam FROM task WHERE NOT EXISTS
+                     (SELECT task_id FROM task_run WHERE
+                     app_id=:app_id AND user_ip=:user_ip AND task_id=task.id AND info LIKE '%"son_app_id": '''+son_app_id+'''%')
+                     AND app_id=:app_id AND state !='completed'
+                     ORDER BY priority_0 DESC, id ASC LIMIT 10''')
+        rows = db.engine.execute(query, app_id=app_id, user_ip=user_ip)
+
+    tasks = []
+    for t in rows:
+        if t.is_it_spam<30:
+            tasks.append(db.session.query(model.Task).get(t.id))
+
+    candidate_tasks = []
+
+    for t in tasks:
+        # DEPRECATED: t.info.n_answers will be removed
+        # DEPRECATED: so if your task has a different value for n_answers
+        # DEPRECATED: use t.n_answers instead
+        #print t.id
+        if (t.info.get('n_answers')):
+            t.n_answers = int(t.info['n_answers'])
+        # NEW WAY!
+        if t.n_answers is None:
+            t.n_answers = 30
+
+        if (len(t.task_runs) >= t.n_answers):
+                t.state = "completed"
+                db.session.merge(t)
+                db.session.commit()
+        else:
+            candidate_tasks.append(t)
+            if (offset == 0):
+                break
+    total_remaining = len(candidate_tasks)
+    #print "Available tasks %s " % total_remaining
+    if total_remaining == 0:
+        return None
+    if (offset == 0):
+        return candidate_tasks[0]
+    else:
+        if (offset < len(candidate_tasks)):
+            return candidate_tasks[offset]
+        else:
+            return None

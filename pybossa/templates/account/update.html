@@ -6,10 +6,10 @@
 {% block content %}
 {% from "_formhelpers.html" import render_field %}
 <div class="row">
-    <div class="span3">
+    <div class="col-sm-3">
         {{ helper.render_account_local_nav(current_user, active_link) }}
     </div>
-    <div class="span9">
+    <div class="col-sm-9">
         <h1><strong>{{current_user.fullname}}</strong>: {{ _('Update your profile') }}</h1>
         <form method="post" class="form-horizontal" action="{{ url_for('account.update_profile') }}">
             <fieldset>

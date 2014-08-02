@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
-DEBUG = False
+DEBUG = True
 
 # webserver host and port
 HOST = '0.0.0.0'
@@ -28,11 +28,20 @@ SECRET_KEY = 'my-session-secret'
 ITSDANGEORUSKEY = 'its-dangerous-key'
 
 ## project configuration
-BRAND = 'PyBossa'
-TITLE = 'PyBossa'
-COPYRIGHT = 'Set Your Institution'
+BRAND = 'GeoTag-X'
+TITLE = 'GeoTag-X Disaster Mapping'
+COPYRIGHT = 'UNITAR'
 DESCRIPTION = 'Set the description in your config'
 TERMSOFUSE = 'http://okfn.org/terms-of-use/'
 DATAUSE = 'http://opendatacommons.org/licenses/by/'
-LOGO = ''
+LOGO = 'default_logo.png'
 LOCALES = ['en', 'es']
+
+
+## Cache setup. By default it is enabled
+## Redis Sentinel
+# List of Sentinel servers (IP, port)
+REDIS_CACHE_ENABLED = False
+REDIS_SENTINEL = [('localhost', 26379)]
+REDIS_MASTER = 'mymaster'
+REDIS_KEYPREFIX = 'pybossa_cache'
