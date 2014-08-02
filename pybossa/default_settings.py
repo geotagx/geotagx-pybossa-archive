@@ -25,7 +25,7 @@ PORT = 5000
 SECRET = 'foobar'
 SECRET_KEY = 'my-session-secret'
 
-ITSDANGEORUSKEY = 'its-dangerous-key'
+ITSDANGEROUSKEY = 'its-dangerous-key'
 
 ## project configuration
 BRAND = 'GeoTag-X'
@@ -45,3 +45,49 @@ REDIS_CACHE_ENABLED = False
 REDIS_SENTINEL = [('localhost', 26379)]
 REDIS_MASTER = 'mymaster'
 REDIS_KEYPREFIX = 'pybossa_cache'
+## Default THEME
+THEME = 'default'
+
+## Default number of apps per page
+APPS_PER_PAGE = 20
+
+## Default allowed extensions
+ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif']
+UPLOAD_METHOD = 'local'
+
+## Default number of users shown in the leaderboard
+LEADERBOARD = 20
+
+## Default configuration for debug toolbar
+ENABLE_DEBUG_TOOLBAR = False
+
+# Cache default key prefix
+REDIS_CACHE_ENABLED = False
+REDIS_SENTINEL = [('localhost', 26379)]
+REDIS_MASTER = 'mymaster'
+
+REDIS_KEYPREFIX = 'pybossa_cache'
+
+## Default cache timeouts
+# App cache
+APP_TIMEOUT = 15 * 60
+REGISTERED_USERS_TIMEOUT = 15 * 60
+ANON_USERS_TIMEOUT = 5 * 60 * 60
+STATS_FRONTPAGE_TIMEOUT = 12 * 60 * 60
+STATS_APP_TIMEOUT = 12 * 60 * 60
+STATS_DRAFT_TIMEOUT = 24 * 60 * 60
+N_APPS_PER_CATEGORY_TIMEOUT = 60 * 60
+# Category cache
+CATEGORY_TIMEOUT = 24 * 60 * 60
+# User cache
+USER_TIMEOUT = 15 * 60
+USER_TOP_TIMEOUT = 24 * 60 * 60
+USER_TOTAL_TIMEOUT = 24 * 60 * 60
+# Project Presenters
+PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf"]
+# Rate limits default values
+LIMIT = 300
+PER = 15 * 60
+
+# Expiration time for password protected project cookies
+PASSWD_COOKIE_TIMEOUT = 60 * 30

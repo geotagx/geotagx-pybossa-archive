@@ -28,7 +28,7 @@ import time
 from functools import update_wrapper, wraps
 from flask import request, g
 from werkzeug.exceptions import TooManyRequests
-from pybossa.core import redis_master
+from pybossa.core import sentinel
 from pybossa.error import ErrorStatus
 
 error = ErrorStatus()
@@ -53,7 +53,7 @@ class RateLimit(object):
         self.per = per
         self.send_x_headers = send_x_headers
 
-        p = redis_master.pipeline()
+        p = sentinel.master.pipeline()
         p.incr(self.key)
         p.expireat(self.key, self.reset + self.expiration_window)
 
@@ -68,7 +68,7 @@ def get_view_rate_limit():
     return getattr(g, '_view_rate_limit', None)
 
 
-def ratelimit(limit, per=300, send_x_headers=True,
+def ratelimit(limit, per, send_x_headers=True,
               scope_func=lambda: request.remote_addr,
               key_func=lambda: request.endpoint,
               path=lambda: request.path):

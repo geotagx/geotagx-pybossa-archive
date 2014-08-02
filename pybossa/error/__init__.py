@@ -19,7 +19,7 @@
 PyBossa error module for processing error status.
 
 This package adds GET, POST, PUT and DELETE errors for the API:
-    * applications,
+    * projects,
     * tasks and
     * task_runs
 
@@ -41,6 +41,7 @@ class ErrorStatus(object):
     error_status = {"Forbidden": 403,
                     "NotFound": 404,
                     "Unauthorized": 401,
+                    "MethodNotAllowed": 405,
                     "TypeError": 415,
                     "ValueError": 415,
                     "DataError": 415,
@@ -58,8 +59,10 @@ class ErrorStatus(object):
         exception_cls = e.__class__.__name__
         if self.error_status.get(exception_cls):
             status = self.error_status.get(exception_cls)
-        else:
+        else: # pragma: no cover
             status = 500
+        if exception_cls == 'Forbidden' or exception_cls == 'Unauthorized':
+            e.message = e.description
         error = dict(action=action.upper(),
                      status="failed",
                      status_code=status,

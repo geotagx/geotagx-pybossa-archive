@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 from helper import web
-from base import model, db
+from default import model, db
 
 
 class Helper(web.Helper):
@@ -45,6 +45,10 @@ class Helper(web.Helper):
 
     def del_task_runs(self, app_id=1):
         """Deletes all TaskRuns for a given app_id"""
-        db.session.query(model.TaskRun).filter_by(app_id=1).delete()
+        db.session.query(model.task_run.TaskRun).filter_by(app_id=app_id).delete()
+        db.session.commit()
+        # Update task.state
+        db.session.query(model.task.Task).filter_by(app_id=app_id)\
+                  .update({"state": "ongoing"})
         db.session.commit()
         db.session.remove()

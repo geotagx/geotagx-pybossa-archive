@@ -25,9 +25,14 @@
 SECRET = 'foobar'
 SECRET_KEY = 'my-session-secret'
 
-SQLALCHEMY_DATABASE_URI = 'postgresql://tester:tester@localhost/pybossa'
-SQLALCHEMY_DATABASE_TEST_URI = 'postgresql://rtester:rtester@localhost/pybossa_test'
-ITSDANGEORUSKEY = 'its-dangerous-key'
+SQLALCHEMY_DATABASE_URI = 'postgresql://pybossa:tester@localhost/pybossa'
+
+##Slave configuration for DB
+#SQLALCHEMY_BINDS = {
+#    'slave': 'postgresql://user:password@server/db'
+#}
+
+ITSDANGEROUSKEY = 'its-dangerous-key'
 
 ## project configuration
 BRAND = 'PyBossa'
@@ -40,6 +45,8 @@ DATAUSE = 'http://opendatacommons.org/licenses/by/'
 CONTACT_EMAIL = 'info@pybossa.com'
 CONTACT_TWITTER = 'PyBossa'
 
+## Default number of projects per page
+## APPS_PER_PAGE = 20
 
 ## External Auth providers
 # TWITTER_CONSUMER_KEY=''
@@ -95,3 +102,27 @@ REDIS_CACHE_ENABLED = True
 REDIS_SENTINEL = [('localhost', 26379)]
 REDIS_MASTER = 'mymaster'
 REDIS_KEYPREFIX = 'pybossa_cache'
+
+## Allowed upload extensions
+ALLOWED_EXTENSIONS = ['js', 'css', 'png', 'jpg', 'jpeg', 'gif']
+
+## If you want to use the local uploader configure which folder
+UPLOAD_METHOD = 'local'
+UPLOAD_FOLDER = 'uploads'
+
+## If you want to use Rackspace for uploads, configure it here
+# RACKSPACE_USERNAME = 'username'
+# RACKSPACE_API_KEY = 'apikey'
+# RACKSPACE_REGION = 'ORD'
+
+## Default number of users shown in the leaderboard
+# LEADERBOARD = 20
+## Default shown presenters
+# PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf"]
+
+# Expiration time for password protected project cookies
+PASSWD_COOKIE_TIMEOUT = 60 * 30
+
+## Ratelimit configuration
+# LIMIT = 300
+# PER = 15 * 60

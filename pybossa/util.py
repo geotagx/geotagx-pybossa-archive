@@ -43,7 +43,7 @@ def jsonpify(f):
     return decorated_function
 
 
-def admin_required(f):
+def admin_required(f):  # pragma: no cover
     """Checks if the user is and admin or not"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -58,16 +58,16 @@ def admin_required(f):
 def crossdomain(origin=None, methods=None, headers=None,
                 max_age=21600, attach_to_all=True,
                 automatic_options=True):
-    if methods is not None:
+    if methods is not None:  # pragma: no cover
         methods = ', '.join(sorted(x.upper() for x in methods))
     if headers is not None and not isinstance(headers, basestring):
         headers = ', '.join(x.upper() for x in headers)
-    if not isinstance(origin, basestring):
+    if not isinstance(origin, basestring):  # pragma: no cover
         origin = ', '.join(origin)
-    if isinstance(max_age, timedelta):
+    if isinstance(max_age, timedelta):  # pragma: no cover
         max_age = max_age.total_seconds()
 
-    def get_methods():
+    def get_methods():  # pragma: no cover
         if methods is not None:
             return methods
 
@@ -77,11 +77,11 @@ def crossdomain(origin=None, methods=None, headers=None,
     def decorator(f):
 
         def wrapped_function(*args, **kwargs):
-            if automatic_options and request.method == 'OPTIONS':
+            if automatic_options and request.method == 'OPTIONS':  # pragma: no cover
                 resp = current_app.make_default_options_response()
             else:
                 resp = make_response(f(*args, **kwargs))
-            if not attach_to_all and request.method != 'OPTIONS':
+            if not attach_to_all and request.method != 'OPTIONS':  # pragma: no cover
                 return resp
 
             h = resp.headers
@@ -98,7 +98,7 @@ def crossdomain(origin=None, methods=None, headers=None,
     return decorator
 
 
-# From http://stackoverflow.com/q/1551382
+# Fromhttp://stackoverflow.com/q/1551382
 def pretty_date(time=False):
     """
     Get a datetime object or a int() Epoch timestamp and return a
@@ -108,8 +108,11 @@ def pretty_date(time=False):
     from datetime import datetime
     import dateutil.parser
     now = datetime.now()
-    time = dateutil.parser.parse(time)
+    if type(time) is str or type(time) is unicode:
+        time = dateutil.parser.parse(time)
     if type(time) is int:
+        diff = now - datetime.fromtimestamp(time)
+    if type(time) is float:
         diff = now - datetime.fromtimestamp(time)
     elif isinstance(time, datetime):
         diff = now - time
@@ -176,51 +179,48 @@ class Pagination(object):
                     (num > self.page - left_current - 1 and
                      num < self.page + right_current) or
                     num > self.pages - right_edge):
-                if last + 1 != num:
+                if last + 1 != num:  # pragma: no cover
                     yield None
                 yield num
                 last = num
 
 
-class Twitter:
+class Twitter(object):
     oauth = OAuth()
 
-    def __init__(self, c_k, c_s):
-        #oauth = OAuth()
-        # Use Twitter as example remote application
+    def __init__(self, app=None):
+        self.app = app
+        if app is not None: # pragma: no cover
+            self.init_app(app)
+
+    def init_app(self, app):
         self.oauth = self.oauth.remote_app(
             'twitter',
-            # unless absolute urls are used to make requests,
-            # this will be added before all URLs. This is also true for
-            # request_token_url and others.
             base_url='https://api.twitter.com/1/',
-            # where flask should look for new request tokens
             request_token_url='https://api.twitter.com/oauth/request_token',
-            # where flask should exchange the token with the remote application
             access_token_url='https://api.twitter.com/oauth/access_token',
-            # twitter knows two authorizatiom URLs. /authorize and
-            # /authenticate. They mostly work the same, but for sign
-            # on /authenticate is expected because this will give
-            # the user a slightly different
-            # user interface on the twitter side.
             authorize_url='https://api.twitter.com/oauth/authenticate',
-            # the consumer keys from the twitter application registry.
-            consumer_key=c_k,  # app.config['TWITTER_CONSUMER_KEY'],
-            consumer_secret=c_s)  # app.config['TWITTER_CONSUMER_KEY']
+            consumer_key=app.config['TWITTER_CONSUMER_KEY'],
+            consumer_secret=app.config['TWITTER_CONSUMER_SECRET'])
 
 
-class Facebook:
+class Facebook(object):
     oauth = OAuth()
 
-    def __init__(self, c_k, c_s):
+    def __init__(self, app=None):
+        self.app = app
+        if app is not None: # pragma: no cover
+            self.init_app(app)
+
+    def init_app(self, app):
         self.oauth = self.oauth.remote_app(
             'facebook',
             base_url='https://graph.facebook.com/',
             request_token_url=None,
             access_token_url='/oauth/access_token',
             authorize_url='https://www.facebook.com/dialog/oauth',
-            consumer_key=c_k,  # app.config['FACEBOOK_APP_ID'],
-            consumer_secret=c_s,  # app.config['FACEBOOK_APP_SECRET']
+            consumer_key=app.config['FACEBOOK_APP_ID'],
+            consumer_secret=app.config['FACEBOOK_APP_SECRET'],
             request_token_params={'scope': 'email'})
 
 
@@ -240,10 +240,15 @@ def utf_8_encoder(unicode_csv_data):
         yield line.encode('utf-8')
 
 
-class Google:
+class Google(object):
     oauth = OAuth()
 
-    def __init__(self, c_k, c_s):
+    def __init__(self, app=None):
+        self.app = app
+        if app is not None: # pragma: no cover
+            self.init_app(app)
+
+    def init_app(self, app):
         self.oauth = self.oauth.remote_app(
             'google',
             base_url='https://www.google.com/accounts/',
@@ -254,8 +259,8 @@ class Google:
             access_token_url='https://accounts.google.com/o/oauth2/token',
             access_token_method='POST',
             access_token_params={'grant_type': 'authorization_code'},
-            consumer_key=c_k,
-            consumer_secret=c_s)
+            consumer_key=app.config['GOOGLE_CLIENT_ID'],
+            consumer_secret=app.config['GOOGLE_CLIENT_SECRET'])
 
 
 class UnicodeWriter:
@@ -289,7 +294,7 @@ class UnicodeWriter:
         # empty queue
         self.queue.truncate(0)
 
-    def writerows(self, rows):
+    def writerows(self, rows):  # pragma: no cover
         for row in rows:
             self.writerow(row)
 
@@ -317,3 +322,19 @@ def get_user_signup_method(user):
         msg += " <strong>It seems that you created an account locally.</strong>"
         msg += " <br/>You can reset your password if you don't remember it."
         return (msg, 'local')
+
+def get_port():
+    import os
+    port = os.environ.get('PORT', '')
+    if port.isdigit():
+        return int(port)
+    else:
+        return current_app.config['PORT']
+
+
+def get_user_id_or_ip():
+    """Returns the id of the current user if is authenticated. Otherwise
+    returns its IP address (defaults to 127.0.0.1)"""
+    user_id = current_user.id if current_user.is_authenticated() else None
+    user_ip = request.remote_addr or "127.0.0.1" if current_user.is_anonymous() else None
+    return dict(user_id=user_id, user_ip=user_ip)

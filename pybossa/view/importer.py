@@ -17,7 +17,8 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 from StringIO import StringIO
-from flaskext.wtf import Form, TextField, validators
+from flask_wtf import Form
+from wtforms import TextField, validators
 from flask.ext.babel import lazy_gettext, gettext
 from pybossa.util import unicode_csv_reader
 import json
@@ -32,11 +33,11 @@ def register_importer(cls):
     return cls
 
 
-def enabled_importers(enabled_importer_names=None):
-    if enabled_importer_names is None:
-        return importers
-    check = lambda i: i.template_id in enabled_importer_names
-    return filter(check, importers)
+# def enabled_importers(enabled_importer_names=None):
+#     if enabled_importer_names is None:
+#         return importers
+#     check = lambda i: i.template_id in enabled_importer_names
+#     return filter(check, importers)
 
 
 class BulkImportException(Exception):
