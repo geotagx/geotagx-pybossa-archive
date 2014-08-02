@@ -10,12 +10,12 @@ Overview
 
 PyBossa has 5 main domain objects:
 
-  * App: the overall Application to which Tasks are associated.
+  * App: the overall Project (formerly named Application) to which Tasks are associated.
 
     * HasMany: Tasks
     * HasA: Category
 
-  * Task: an individual Task which can be performed by a user. A Task is associated to an App.
+  * Task: an individual Task which can be performed by a user. A Task is associated to a project.
 
     * HasA: App
     * HasMany: TaskRuns
@@ -26,7 +26,7 @@ PyBossa has 5 main domain objects:
     * HasA: User
 
   * User: a user account
-  * Category: an application category
+  * Category: a project category
 
 There are some attributes common across most of the domain objects notably:
 
@@ -39,29 +39,29 @@ documentation of main model attributes.
 App
 ---
 
-.. autoclass:: pybossa.model.App
+.. autoclass:: pybossa.model.app.App
    :members:
 
 Category
 --------
 
-.. autoclass:: pybossa.model.Category
+.. autoclass:: pybossa.model.category.Category
     :members:
 
 Task
 ----
 
-.. autoclass:: pybossa.model.Task
+.. autoclass:: pybossa.model.task.Task
    :members:
 
 TaskRun
 -------
 
-.. autoclass:: pybossa.model.TaskRun
+.. autoclass:: pybossa.model.task_run.TaskRun
    :members:
 
 User
 ----
 
-.. autoclass:: pybossa.model.User
+.. autoclass:: pybossa.model.user.User
     :members:

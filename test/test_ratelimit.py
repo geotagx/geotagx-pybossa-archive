@@ -24,29 +24,24 @@ API endpoints like userprogress or vmcp.
 """
 import json
 
-from base import web, model, Fixtures, db, redis_flushall
+from default import flask_app, sentinel
+from factories import AppFactory, UserFactory
+from mock import patch
 
 
-class TestAPI:
+class TestAPI(object):
+
+    app = flask_app.test_client()
+
     def setUp(self):
-        self.app = web.app.test_client()
-        model.rebuild_db()
-        Fixtures.create()
-        self.endpoints = ['app', 'task', 'taskrun']
+        sentinel.connection.master_for('mymaster').flushall()
 
-    def tearDown(self):
-        db.session.remove()
-        redis_flushall()
+    limit = flask_app.config.get('LIMIT')
 
-    @classmethod
-    def teardown_class(cls):
-        model.rebuild_db()
 
     def check_limit(self, url, action, obj, data=None):
-        # Reset keys in Redis
-        redis_flushall()
         # Set the limit
-        limit = 299
+        limit = self.limit - 1
         # Start check
         for i in range(limit, -1, -1):
             if action == 'get':
@@ -76,6 +71,8 @@ class TestAPI:
             # Error message
             err_msg = "GET X-RateLimit-Remaining not working"
             # Tests
+            print "X-RateLimit-Remaining: %s" % res.headers['X-RateLimit-Remaining']
+            print "Expected value: %s" % i
             assert int(res.headers['X-RateLimit-Remaining']) == i, err_msg
             if res.headers['X-RateLimit-Remaining'] == 0:
                 error = json.loads(res.data)
@@ -93,40 +90,40 @@ class TestAPI:
         action = 'get'
         self.check_limit(url, action, 'app')
 
-    def test_00_app_get(self):
+    @patch('pybossa.api.api_base.APIBase._db_query')
+    def test_00_app_get(self, mock):
         """Test API.app GET rate limit."""
+        mock.return_value = {}
         # GET as Anonymous
         url = '/api/app'
         action = 'get'
         self.check_limit(url, action, 'app')
 
-    def test_01_app_post(self):
+    @patch('pybossa.api.api_base.APIBase._create_instance_from_request')
+    def test_01_app_post(self, mock):
         """Test API.app POST rate limit."""
-        url = '/api/app?api_key=' + Fixtures.api_key
+        mock.return_value = {}
+        url = '/api/app'
         self.check_limit(url, 'post', 'app')
 
-    def test_02_app_delete(self):
+    @patch('pybossa.api.api_base.APIBase._delete_instance')
+    def test_02_app_delete(self, mock):
         """Test API.app DELETE rate limit."""
-        for i in range(300):
-            app = model.App(name=str(i), short_name=str(i), description=str(i))
-            db.session.add(app)
-        db.session.commit()
-
-        url = '?api_key=%s' % (Fixtures.api_key)
+        mock.return_value = {}
+        url = ''
         self.check_limit(url, 'delete', 'app')
 
-    def test_03_app_put(self):
+    @patch('pybossa.api.api_base.APIBase._update_instance')
+    def test_03_app_put(self, mock):
         """Test API.app PUT rate limit."""
-        for i in range(300):
-            app = model.App(name=str(i), short_name=str(i), description=str(i))
-            db.session.add(app)
-        db.session.commit()
-
-        url = '?api_key=%s' % (Fixtures.api_key)
+        mock.return_value = {}
+        url = ''
         self.check_limit(url, 'put', 'app')
 
-    def test_04_new_task(self):
+    @patch('pybossa.api._retrieve_new_task')
+    def test_04_new_task(self, mock):
         """Test API.new_task(app_id) GET rate limit."""
+        mock.return_value = {}
         url = '/api/app/1/newtask'
         self.check_limit(url, 'get', 'app')
 
@@ -135,7 +132,9 @@ class TestAPI:
         url = '/api/vmcp'
         self.check_limit(url, 'get', 'app')
 
-    def test_05_user_progress(self):
+    @patch('pybossa.api._retrieve_app')
+    def test_05_user_progress(self, mock):
         """Test API.user_progress GET rate limit."""
+        mock.return_value = None
         url = '/api/app/1/userprogress'
         self.check_limit(url, 'get', 'app')

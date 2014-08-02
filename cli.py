@@ -4,12 +4,18 @@ import sys
 import optparse
 import inspect
 
-import pybossa.model as model
-from pybossa.core import db
-import pybossa.web as web
+#import pybossa.model as model
+from pybossa.core import db, create_app
+from pybossa.model.app import App
+from pybossa.model.user import User
+from pybossa.model.category import Category
 
 from alembic.config import Config
 from alembic import command
+from html2text import html2text
+from sqlalchemy.sql import text
+
+app = create_app()
 
 def setup_alembic_config():
     if "DATABASE_URL" not in os.environ:
@@ -30,39 +36,214 @@ def setup_alembic_config():
 
 def db_create():
     '''Create the db'''
-    db.create_all()
-    # then, load the Alembic configuration and generate the
-    # version table, "stamping" it with the most recent rev:
-    setup_alembic_config()
-    # finally, add a minimum set of categories: Volunteer Thinking, Volunteer Sensing, Published and Draft
-    categories = []
-    categories.append(model.Category(name="Thinking",
-                                     short_name='thinking',
-                                     description='Volunteer Thinking apps'))
-    categories.append(model.Category(name="Volunteer Sensing",
-                                     short_name='sensing',
-                                     description='Volunteer Sensing apps'))
-    db.session.add_all(categories)
-    db.session.commit()
+    with app.app_context():
+        db.create_all()
+        # then, load the Alembic configuration and generate the
+        # version table, "stamping" it with the most recent rev:
+        setup_alembic_config()
+        # finally, add a minimum set of categories: Volunteer Thinking, Volunteer Sensing, Published and Draft
+        categories = []
+        categories.append(Category(name="Thinking",
+                          short_name='thinking',
+                          description='Volunteer Thinking projects'))
+        categories.append(Category(name="Volunteer Sensing",
+                          short_name='sensing',
+                          description='Volunteer Sensing projects'))
+        db.session.add_all(categories)
+        db.session.commit()
 
 def db_rebuild():
     '''Rebuild the db'''
-    db.drop_all()
-    db.create_all()
-    # then, load the Alembic configuration and generate the
-    # version table, "stamping" it with the most recent rev:
-    setup_alembic_config()
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+        # then, load the Alembic configuration and generate the
+        # version table, "stamping" it with the most recent rev:
+        setup_alembic_config()
 
 def fixtures():
     '''Create some fixtures!'''
-    user = model.User(
-        name=u'tester',
-        email_addr=u'tester@tester.org',
-        api_key='tester'
-        )
-    user.set_password(u'tester')
-    db.session.add(user)
-    db.session.commit()
+    with app.app_context():
+        user = User(
+            name=u'tester',
+            email_addr=u'tester@tester.org',
+            api_key='tester'
+            )
+        user.set_password(u'tester')
+        db.session.add(user)
+        db.session.commit()
+
+def markdown_db_migrate():
+    '''Perform a migration of the app long descriptions from HTML to
+    Markdown for existing database records'''
+    with app.app_context():
+        query = 'SELECT id, long_description FROM "app";'
+        query_result = db.engine.execute(query)
+        old_descriptions = query_result.fetchall()
+        for old_desc in old_descriptions:
+            if old_desc.long_description:
+                new_description = html2text(old_desc.long_description)
+                query = text('''
+                           UPDATE app SET long_description=:long_description
+                           WHERE id=:id''')
+                db.engine.execute(query, long_description = new_description, id = old_desc.id)
+
+
+def bootstrap_avatars():
+    """Download current links from user avatar and projects to real images hosted in the
+    PyBossa server."""
+    import requests
+    import os
+    import time
+    from urlparse import urlparse
+    from PIL import Image
+
+    def get_gravatar_url(email, size):
+        # import code for encoding urls and generating md5 hashes
+        import urllib, hashlib
+
+        # construct the url
+        gravatar_url = "http://www.gravatar.com/avatar/" + hashlib.md5(email.lower()).hexdigest() + "?"
+        gravatar_url += urllib.urlencode({'d':404, 's':str(size)})
+        return gravatar_url
+
+    with app.app_context():
+        if app.config['UPLOAD_METHOD'] == 'local':
+            users = User.query.order_by('id').all()
+            print "Downloading avatars for %s users" % len(users)
+            for u in users[0:10]:
+                print "Downloading avatar for %s ..." % u.name
+                container = "user_%s" % u.id
+                path = os.path.join(app.config.get('UPLOAD_FOLDER'), container)
+                try:
+                    print get_gravatar_url(u.email_addr, 100)
+                    r = requests.get(get_gravatar_url(u.email_addr, 100), stream=True)
+                    if r.status_code == 200:
+                        if not os.path.isdir(path):
+                            os.makedirs(path)
+                        prefix = time.time()
+                        filename = "%s_avatar.png" % prefix
+                        with open(os.path.join(path, filename), 'wb') as f:
+                            for chunk in r.iter_content(1024):
+                                f.write(chunk)
+                        u.info['avatar'] = filename
+                        u.info['container'] = container
+                        db.session.commit()
+                        print "Done!"
+                    else:
+                        print "No Gravatar, this user will use the placeholder."
+                except:
+                    raise
+                    print "No gravatar, this user will use the placehoder."
+
+
+            apps = App.query.all()
+            print "Downloading avatars for %s projects" % len(apps)
+            for a in apps[0:1]:
+                if a.info.get('thumbnail') and not a.info.get('container'):
+                    print "Working on project: %s ..." % a.short_name
+                    print "Saving avatar: %s ..." % a.info.get('thumbnail')
+                    url = urlparse(a.info.get('thumbnail'))
+                    if url.scheme and url.netloc:
+                        container = "user_%s" % a.owner_id
+                        path = os.path.join(app.config.get('UPLOAD_FOLDER'), container)
+                        try:
+                            r = requests.get(a.info.get('thumbnail'), stream=True)
+                            if r.status_code == 200:
+                                prefix = time.time()
+                                filename = "app_%s_thumbnail_%i.png" % (a.id, prefix)
+                                if not os.path.isdir(path):
+                                    os.makedirs(path)
+                                with open(os.path.join(path, filename), 'wb') as f:
+                                    for chunk in r.iter_content(1024):
+                                        f.write(chunk)
+                                a.info['thumbnail'] = filename
+                                a.info['container'] = container
+                                db.session.commit()
+                                print "Done!"
+                        except:
+                            print "Something failed, this project will use the placehoder."
+        if app.config['UPLOAD_METHOD'] == 'rackspace':
+            import pyrax
+            import tempfile
+            pyrax.set_setting("identity_type", "rackspace")
+            pyrax.set_credentials(username=app.config['RACKSPACE_USERNAME'],
+                                  api_key=app.config['RACKSPACE_API_KEY'],
+                                  region=app.config['RACKSPACE_REGION'])
+
+            cf = pyrax.cloudfiles
+            users = User.query.all()
+            print "Downloading avatars for %s users" % len(users)
+            dirpath = tempfile.mkdtemp()
+            for u in users:
+                try:
+                    r = requests.get(get_gravatar_url(u.email_addr, 100), stream=True)
+                    if r.status_code == 200:
+                        print "Downloading avatar for %s ..." % u.name
+                        container = "user_%s" % u.id
+                        try:
+                            cf.get_container(container)
+                        except pyrax.exceptions.NoSuchContainer:
+                            cf.create_container(container)
+                            cf.make_container_public(container)
+                        prefix = time.time()
+                        filename = "%s_avatar.png" % prefix
+                        with open(os.path.join(dirpath, filename), 'wb') as f:
+                            for chunk in r.iter_content(1024):
+                                f.write(chunk)
+                        chksum = pyrax.utils.get_checksum(os.path.join(dirpath,
+                                                                       filename))
+                        cf.upload_file(container,
+                                       os.path.join(dirpath, filename),
+                                       obj_name=filename,
+                                       etag=chksum)
+                        u.info['avatar'] = filename
+                        u.info['container'] = container
+                        db.session.commit()
+                        print "Done!"
+                    else:
+                        print "No Gravatar, this user will use the placeholder."
+                except:
+                    print "No gravatar, this user will use the placehoder."
+
+
+            apps = App.query.all()
+            print "Downloading avatars for %s projects" % len(apps)
+            for a in apps:
+                if a.info.get('thumbnail') and not a.info.get('container'):
+                    print "Working on project: %s ..." % a.short_name
+                    print "Saving avatar: %s ..." % a.info.get('thumbnail')
+                    url = urlparse(a.info.get('thumbnail'))
+                    if url.scheme and url.netloc:
+                        container = "user_%s" % a.owner_id
+                        try:
+                            cf.get_container(container)
+                        except pyrax.exceptions.NoSuchContainer:
+                            cf.create_container(container)
+                            cf.make_container_public(container)
+
+                        try:
+                            r = requests.get(a.info.get('thumbnail'), stream=True)
+                            if r.status_code == 200:
+                                prefix = time.time()
+                                filename = "app_%s_thumbnail_%i.png" % (a.id, prefix)
+                                with open(os.path.join(dirpath, filename), 'wb') as f:
+                                    for chunk in r.iter_content(1024):
+                                        f.write(chunk)
+                                chksum = pyrax.utils.get_checksum(os.path.join(dirpath,
+                                                                               filename))
+                                cf.upload_file(container,
+                                               os.path.join(dirpath, filename),
+                                               obj_name=filename,
+                                               etag=chksum)
+                                a.info['thumbnail'] = filename
+                                a.info['container'] = container
+                                db.session.commit()
+                                print "Done!"
+                        except:
+                            print "Something failed, this project will use the placehoder."
+
+
 
 
 ## ==================================================

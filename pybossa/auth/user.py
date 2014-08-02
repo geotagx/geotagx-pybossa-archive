@@ -20,13 +20,7 @@ from flask.ext.login import current_user
 
 
 def create(user=None):
-    if current_user.is_authenticated():
-        if current_user.admin:
-            return True
-        else:
-            return False
-    else:
-        return False
+    return current_user.is_authenticated() and current_user.admin is True
 
 
 def read(user=None):
@@ -34,7 +28,7 @@ def read(user=None):
 
 
 def update(user):
-    return create(user)
+    return create(user) or user.id == current_user.id
 
 
 def delete(user):

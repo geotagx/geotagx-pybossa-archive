@@ -1,14 +1,14 @@
-[![Travis CI](https://travis-ci.org/PyBossa/pybossa.png)](https://travis-ci.org/#!/PyBossa/pybossa)
+[![Travis CI](https://travis-ci.org/PyBossa/pybossa.png?branch=master)](https://travis-ci.org/#!/PyBossa/pybossa)  [![Coverage Status](https://coveralls.io/repos/PyBossa/pybossa/badge.png)](https://coveralls.io/r/PyBossa/pybossa?branch=master)
 
 PyBossa is an open source platform for crowd-sourcing online (volunteer)
 assistance to perform tasks that require human cognition, knowledge or
 intelligence (e.g. image classification, transcription, information location
 etc). 
 
-![Shuttleworth Foundation Funded](http://daniellombrana.es/static/images/project/shuttleworth_funded.png)
+![Shuttleworth Foundation Funded](http://pybossa.com/assets/img/shuttleworth-funded.png)
 
 PyBossa was inspired by the [BOSSA](http://bossa.berkeley.edu/) crowdsourcing engine but is written in
-python (hence the name!). It can be used for any distributed tasks application
+python (hence the name!). It can be used for any distributed tasks project
 but was initially developed to help scientists and other researchers
 crowd-source human problem-solving skills!
 
@@ -25,24 +25,12 @@ documentation**
 
 See [installation instructions](http://docs.pybossa.com/en/latest/install.html).
 
-**NOTE**: The latest version uses M2CRYPTO and the pypi version has a bug that
-does not allow you to sign properly RSA keys, however it will install it
-perfectly well. For this reason, you will need to install it using this other
-version: pip install -e git+https://github.com/Hypernode/M2Crypto#egg=M2Crypto
-
-
 # Running Tests
 
-Set SQLALCHEMY_DATABASE_TEST_URI e.g.:
+Just run the following command:
 
 ```
-  SQLALCHEMY_DATABASE_URI = 'postgres://pybossa:pass@localhost/pybossa'
-```
-
-Then run the tests (requires nose):
-
-```
-  nosetests -v test/
+  nosetests test/
 ```
 
 # Useful Links
@@ -61,15 +49,13 @@ It has the instructions to become a contributor.
 
 * [Daniel Lombraña González](http://daniellombrana.es) - [Citizen Cyberscience Centre](http://citizencyberscience.net/), [Shuttleworth Fellow](http://www.shuttleworthfoundation.org/fellows/daniel-lombrana/)
 * Rufus Pollock - [Open Knowledge Foundation](http://okfn.org/)
-* David Anderson - BOINC / Berkeley (via BOSSA)
 
-* [Twitter Bootstrap Icons by Glyphicons](http://http://glyphicons.com/)
 * [FontAwesome fonts](http://fortawesome.github.com/Font-Awesome/)
 * [GeoLite data by MaxMind](http://www.maxmind.com)
 
 ## Copyright / License
 
-Copyright 2013 SF Isle of Man Limited. 
+Copyright 2014 SF Isle of Man Limited. 
 
 Source Code License: The GNU Affero General Public License, either version 3 of the License
 or (at your option) any later version. (see COPYING file)

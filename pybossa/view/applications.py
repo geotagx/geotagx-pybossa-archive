@@ -16,32 +16,42 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
+import time
 from StringIO import StringIO
 from flask import Blueprint, request, url_for, flash, redirect, abort, Response, current_app
 from flask import render_template, make_response
-from flaskext.wtf import Form, IntegerField, DecimalField, TextField, BooleanField, \
-    SelectField, validators, HiddenInput, TextAreaField
+from flask_wtf import Form
+from flask_wtf.file import FileField, FileRequired
+from wtforms import IntegerField, DecimalField, TextField, BooleanField, \
+    SelectField, validators, TextAreaField, PasswordField
+from wtforms.widgets import HiddenInput
 from flask.ext.login import login_required, current_user
 from flask.ext.babel import lazy_gettext, gettext
-from werkzeug.exceptions import HTTPException
 from sqlalchemy.sql import text
 
 import pybossa.model as model
 import pybossa.stats as stats
 import pybossa.validator as pb_validator
+import pybossa.sched as sched
 
-from pybossa.core import db
+from pybossa.core import db, uploader, signer, get_session
 from pybossa.cache import ONE_DAY, ONE_HOUR
-from pybossa.model import App, Task, User
-from pybossa.util import Pagination, UnicodeWriter, admin_required
+from pybossa.model.app import App
+from pybossa.model.task import Task
+from pybossa.model.user import User
+from pybossa.util import Pagination, UnicodeWriter, admin_required, get_user_id_or_ip
 from pybossa.auth import require
 from pybossa.cache import apps as cached_apps
 from pybossa.cache import categories as cached_cat
+from pybossa.cache.helpers import add_custom_contrib_button_to
 from pybossa.ckan import Ckan
+from pybossa.extensions import misaka
+from pybossa.cookies import CookieHandler
+from pybossa.password_manager import ProjectPasswdManager
 
+import re
 import json
 import importer
-import presenter as presenter_module
 import operator
 import math
 import requests
@@ -49,31 +59,46 @@ import requests
 blueprint = Blueprint('app', __name__)
 
 
-class AppForm(Form):
+class AvatarUploadForm(Form):
     id = IntegerField(label=None, widget=HiddenInput())
+    avatar = FileField(lazy_gettext('Avatar'), validators=[FileRequired()])
+    x1 = IntegerField(label=None, widget=HiddenInput(), default=0)
+    y1 = IntegerField(label=None, widget=HiddenInput(), default=0)
+    x2 = IntegerField(label=None, widget=HiddenInput(), default=0)
+    y2 = IntegerField(label=None, widget=HiddenInput(), default=0)
+
+
+class AppForm(Form):
     name = TextField(lazy_gettext('Name'),
                      [validators.Required(),
-                      pb_validator.Unique(db.session, model.App, model.App.name,
-                                          message="Name is already taken.")])
+                      pb_validator.Unique(db.session, model.app.App, model.app.App.name,
+                                          message=lazy_gettext("Name is already taken."))])
     short_name = TextField(lazy_gettext('Short Name'),
                            [validators.Required(),
                             pb_validator.NotAllowedChars(),
                             pb_validator.Unique(
-                                db.session, model.App, model.App.short_name,
+                                db.session, model.app.App, model.app.App.short_name,
                                 message=lazy_gettext(
                                     "Short Name is already taken."))])
-    description = TextField(lazy_gettext('Description'),
+    long_description = TextAreaField(lazy_gettext('Long Description'),
+                                     [validators.Required()])
+
+
+class AppUpdateForm(AppForm):
+    id = IntegerField(label=None, widget=HiddenInput())
+    description = TextAreaField(lazy_gettext('Description'),
                             [validators.Required(
                                 message=lazy_gettext(
-                                    "You must provide a description."))])
-    thumbnail = TextField(lazy_gettext('Icon Link'))
+                                    "You must provide a description.")),
+                             validators.Length(max=255)])
+    long_description = TextAreaField(lazy_gettext('Long Description'))
     allow_anonymous_contributors = SelectField(
         lazy_gettext('Allow Anonymous Contributors'),
         choices=[('True', lazy_gettext('Yes')),
                  ('False', lazy_gettext('No'))])
     category_id = SelectField(lazy_gettext('Category'), coerce=int)
-    long_description = TextAreaField(lazy_gettext('Long Description'))
     hidden = BooleanField(lazy_gettext('Hide?'))
+    password = TextField(lazy_gettext('Password (leave blank for no password)'))
 
 
 class TaskPresenterForm(Form):
@@ -110,28 +135,46 @@ class TaskSchedulerForm(Form):
                                  ('random', lazy_gettext('Random')),
 								 ('filter_by_users', lazy_gettext('Filtered by Users'))],)
 
+class BlogpostForm(Form):
+    id = IntegerField(label=None, widget=HiddenInput())
+    title = TextField(lazy_gettext('Title'),
+                     [validators.Required(message=lazy_gettext(
+                                    "You must enter a title for the post."))])
+    body = TextAreaField(lazy_gettext('Body'),
+                           [validators.Required(message=lazy_gettext(
+                                    "You must enter some text for the post."))])
+
+
+class PasswordForm(Form):
+    password = PasswordField(lazy_gettext('Password'),
+                        [validators.Required(message=lazy_gettext(
+                                    "You must enter a password"))])
+
 
 def app_title(app, page_name):
-    if not app:
-        return "Application not found"
+    if not app:  # pragma: no cover
+        return "Project not found"
     if page_name is None:
-        return "Application: %s" % (app.name)
-    return "Application: %s &middot; %s" % (app.name, page_name)
+        return "Project: %s" % (app.name)
+    return "Project: %s &middot; %s" % (app.name, page_name)
 
 
 def app_by_shortname(short_name):
     app = cached_apps.get_app(short_name)
-    if app.id:
+    if app:
+        # Get owner
+        owner = User.query.get(app.owner_id)
         # Populate CACHE with the data of the app
         return (app,
+                owner,
                 cached_apps.n_tasks(app.id),
                 cached_apps.n_task_runs(app.id),
                 cached_apps.overall_progress(app.id),
                 cached_apps.last_activity(app.id))
 
     else:
+        cached_apps.delete_app(short_name)
         return abort(404)
-    #return App.query.filter_by(short_name=short_name).first_or_404()
 
 
 @blueprint.route('/', defaults={'page': 1})
@@ -143,9 +186,9 @@ def redirect_old_featured(page):
 
 @blueprint.route('/published/', defaults={'page': 1})
 @blueprint.route('/published/<int:page>/', defaults={'page': 1})
-def redirect_old_published(page):
+def redirect_old_published(page):  # pragma: no cover
     """DEPRECATED only to redirect old links"""
-    category = db.session.query(model.Category).first()
+    category = db.session.query(model.category.Category).first()
     return redirect(url_for('.app_cat_index', category=category.short_name, page=page), 301)
 
 
@@ -166,14 +209,7 @@ def index(page):
                          True, False)
     else:
         categories = cached_cat.get_all()
-        if len(categories) > 0:
-            cat_short_name = categories[0].short_name
-        else:
-            cat = db.session.query(model.Category).first()
-            if cat:
-                cat_short_name = cat.short_name
-            else:
-                cat_short_name = "algo"
+        cat_short_name = categories[0].short_name
         return redirect(url_for('.app_cat_index', category=cat_short_name))
 
 def get_app_category(app_short_name):
@@ -195,7 +231,7 @@ def get_app_category(app_short_name):
 def app_index(page, lookup, category, fallback, use_count):
     """Show apps of app_type"""
 
-    per_page = 5
+    per_page = current_app.config['APPS_PER_PAGE']
     # @FC to come back to project homepage from the application detail
     if 'cat_byapp_' in category:
         category = get_app_category(category.replace("cat_byapp_", ""))
@@ -214,24 +250,27 @@ def app_index(page, lookup, category, fallback, use_count):
             data.append(dict(app=app, n_tasks=cached_apps.n_tasks(app['id']),
                              overall_progress=cached_apps.overall_progress(app['id']),
                              last_activity=cached_apps.last_activity(app['id'])))
+                         last_activity_raw=app['last_activity_raw'],
+                         n_completed_tasks=cached_apps.n_completed_tasks(app['id']),
+                         n_volunteers=cached_apps.n_volunteers(app['id'])))
 
-    if fallback and not apps:
-        return redirect(url_for('.published'))
+    if fallback and not apps:  # pragma: no cover
+        return redirect(url_for('.index'))
 
     pagination = Pagination(page, per_page, count)
     categories = cached_cat.get_all()
     # Check for pre-defined categories featured and draft
-    featured_cat = model.Category(name='Featured',
+    featured_cat = model.category.Category(name='Featured',
                                   short_name='featured',
-                                  description='Featured applications')
+                                  description='Featured projects')
     if category == 'featured':
         active_cat = featured_cat
     elif category == 'draft':
-        active_cat = model.Category(name='Draft',
+        active_cat = model.category.Category(name='Draft',
                                     short_name='draft',
-                                    description='Draft applications')
+                                    description='Draft projects')
     else:
-        active_cat = db.session.query(model.Category)\
+        active_cat = db.session.query(model.category.Category)\
                        .filter_by(short_name=category).first()
 
     # Check if we have to add the section Featured to local nav
@@ -239,7 +278,7 @@ def app_index(page, lookup, category, fallback, use_count):
         categories.insert(0, featured_cat)
     template_args = {
         "apps": data,
-        "title": gettext("Applications"),
+        "title": gettext("Projects"),
         "pagination": pagination,
         "active_cat": active_cat,
         "n_apps_per_category": None,
@@ -275,16 +314,24 @@ def app_cat_index(category, page):
 @login_required
 @admin_required
 def new():
-    if not require.app.create():
-        abort(403)
+    require.app.create()
     form = AppForm(request.form)
-    categories = db.session.query(model.Category).all()
-    form.category_id.choices = [(c.id, c.name) for c in categories]
 
     def respond(errors):
         return render_template('applications/new.html',
-                               title=gettext("Create an Application"),
+                               title=gettext("Create a Project"),
                                form=form, errors=errors)
+
+    def _description_from_long_description():
+        long_desc = form.long_description.data
+        html_long_desc = misaka.render(long_desc)[:-1]
+        remove_html_tags_regex = re.compile('<[^>]*>')
+        blank_space_regex = re.compile('\n')
+        text_desc = remove_html_tags_regex.sub("", html_long_desc)[:255]
+        if len(text_desc) >= 252:
+            text_desc = text_desc[:-3]
+            text_desc += "..."
+        return blank_space_regex.sub(" ", text_desc)
 
     if request.method != 'POST':
         return respond(False)
@@ -294,25 +341,20 @@ def new():
         return respond(True)
 
     info = {}
-    # Add the info items
-    if form.thumbnail.data:
-        info['thumbnail'] = form.thumbnail.data
+    category_by_default = cached_cat.get_all()[0]
 
-    app = model.App(name=form.name.data,
+    app = model.app.App(name=form.name.data,
                     short_name=form.short_name.data,
-                    description=form.description.data,
+                    description=_description_from_long_description(),
                     long_description=form.long_description.data,
-                    category_id=form.category_id.data,
-                    allow_anonymous_contributors=form.allow_anonymous_contributors.data,
-                    hidden=int(form.hidden.data),
                     owner_id=current_user.id,
-                    info=info,)
+                    info=info,
+                    category_id=category_by_default.id)
 
-    #cached_apps.reset()
     db.session.add(app)
     db.session.commit()
-    # Clean cache
-    msg_1 = gettext('Application created!')
+
+    msg_1 = gettext('Project created!')
     flash('<i class="icon-ok"></i> ' + msg_1, 'success')
     flash('<i class="icon-bullhorn"></i> ' +
           gettext('You can check the ') +
@@ -321,7 +363,7 @@ def new():
           '</a></strong> ' +
           gettext('for adding tasks, a thumbnail, using PyBossa.JS, etc.'),
           'info')
-    return redirect(url_for('.settings', short_name=app.short_name))
+    return redirect(url_for('.update', short_name=app.short_name))
 
 
 
@@ -329,205 +371,232 @@ def new():
 @login_required
 @admin_required
 def task_presenter_editor(short_name):
-    try:
-        errors = False
-        app, n_tasks, n_task_runs, overall_progress, last_activty = app_by_shortname(short_name)
-        title = app_title(app, "Task Presenter Editor")
-        require.app.read(app)
-        require.app.update(app)
+    errors = False
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    title = app_title(app, "Task Presenter Editor")
+    require.app.read(app)
+    require.app.update(app)
 
-        form = TaskPresenterForm(request.form)
-        if request.method == 'POST' and form.validate():
-            db_app = db.session.query(model.App).filter_by(id=app.id).first()
-            db_app.info['task_presenter'] = form.editor.data
-            db.session.add(db_app)
-            db.session.commit()
-            cached_apps.delete_app(app.short_name)
-            msg_1 = gettext('Task presenter added!')
-            flash('<i class="icon-ok"></i> ' + msg_1, 'success')
-            return redirect(url_for('.tasks', short_name=app.short_name))
+    form = TaskPresenterForm(request.form)
+    form.id.data = app.id
+    if request.method == 'POST' and form.validate():
+        app = App.query.get(app.id)
+        app.info['task_presenter'] = form.editor.data
+        db.session.commit()
+        cached_apps.delete_app(app.short_name)
+        msg_1 = gettext('Task presenter added!')
+        flash('<i class="icon-ok"></i> ' + msg_1, 'success')
+        return redirect(url_for('.tasks', short_name=app.short_name))
 
-        if request.method == 'POST' and not form.validate():
-            flash(gettext('Please correct the errors'), 'error')
-            errors = True
+    # It does not have a validation
+    if request.method == 'POST' and not form.validate():  # pragma: no cover
+        flash(gettext('Please correct the errors'), 'error')
+        errors = True
 
-        if request.method != 'GET':
-            return
+    if app.info.get('task_presenter'):
+        form.editor.data = app.info['task_presenter']
+    else:
+        if not request.args.get('template'):
+            msg_1 = gettext('<strong>Note</strong> You will need to upload the'
+                            ' tasks using the')
+            msg_2 = gettext('CSV importer')
+            msg_3 = gettext(' or download the project bundle and run the'
+                            ' <strong>createTasks.py</strong> script in your'
+                            ' computer')
+            url = '<a href="%s"> %s</a>' % (url_for('app.import_task',
+                                                    short_name=app.short_name), msg_2)
+            msg = msg_1 + url + msg_3
+            flash(msg, 'info')
 
-        if app.info.get('task_presenter'):
-            form.editor.data = app.info['task_presenter']
-        else:
-            if not request.args.get('template'):
-                msg_1 = gettext('<strong>Note</strong> You will need to upload the'
-                                ' tasks using the')
-                msg_2 = gettext('CSV importer')
-                msg_3 = gettext(' or download the app bundle and run the'
-                                ' <strong>createTasks.py</strong> script in your'
-                                ' computer')
-                url = '<a href="%s"> %s</a>' % (url_for('app.import_task',
-                                                        short_name=app.short_name), msg_2)
-                msg = msg_1 + url + msg_3
-                flash(msg, 'info')
+            wrap = lambda i: "applications/presenters/%s.html" % i
+            pres_tmpls = map(wrap, current_app.config.get('PRESENTERS'))
 
-                wrap = lambda i: "applications/presenters/%s.html" % i
-                pres_tmpls = map(wrap, presenter_module.presenters)
+            app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+            return render_template(
+                'applications/task_presenter_options.html',
+                title=title,
+                app=app,
+                owner=owner,
+                overall_progress=overall_progress,
+                n_tasks=n_tasks,
+                n_task_runs=n_task_runs,
+                last_activity=last_activity,
+                n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                n_volunteers=cached_apps.n_volunteers(app.get('id')),
+                presenters=pres_tmpls)
 
-                return render_template(
-                    'applications/task_presenter_options.html',
-                    title=title,
-                    app=app,
-                    presenters=pres_tmpls)
-
-            tmpl_uri = "applications/snippets/%s.html" \
-                % request.args.get('template')
-            tmpl = render_template(tmpl_uri, app=app)
-            form.editor.data = tmpl
-            msg = 'Your code will be <em>automagically</em> rendered in \
-                          the <strong>preview section</strong>. Click in the \
-                          preview button!'
-            flash(gettext(msg), 'info')
-        return render_template('applications/task_presenter_editor.html',
-                               title=title,
-                               form=form,
-                               app=app,
-                               errors=errors)
-    except HTTPException as e:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise e
+        tmpl_uri = "applications/snippets/%s.html" \
+            % request.args.get('template')
+        tmpl = render_template(tmpl_uri, app=app)
+        form.editor.data = tmpl
+        msg = 'Your code will be <em>automagically</em> rendered in \
+                      the <strong>preview section</strong>. Click in the \
+                      preview button!'
+        flash(gettext(msg), 'info')
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+    return render_template('applications/task_presenter_editor.html',
+                           title=title,
+                           form=form,
+                           app=app,
+                           owner=owner,
+                           overall_progress=overall_progress,
+                           n_tasks=n_tasks,
+                           n_task_runs=n_task_runs,
+                           last_activity=last_activity,
+                           n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                           n_volunteers=cached_apps.n_volunteers(app.get('id')),
+                           errors=errors)
 
 
 @blueprint.route('/<short_name>/delete', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def delete(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
-    try:
-        title = app_title(app, "Delete")
-        require.app.read(app)
-        require.app.delete(app)
-        if request.method == 'GET':
-            return render_template('/applications/delete.html',
-                                   title=title,
-                                   app=app,
-                                   n_tasks=n_tasks,
-                                   overall_progress=overall_progress,
-                                   last_activity=last_activity)
-        # Clean cache
-        cached_apps.delete_app(app.short_name)
-        cached_apps.clean(app.id)
-        app = App.query.get(app.id)
-        db.session.delete(app)
-        db.session.commit()
-        flash(gettext('Application deleted!'), 'success')
-        return redirect(url_for('account.profile'))
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    (app, owner, n_tasks,
+    n_task_runs, overall_progress, last_activity) = app_by_shortname(short_name)
+    title = app_title(app, "Delete")
+    require.app.read(app)
+    require.app.delete(app)
+    if request.method == 'GET':
+        return render_template('/applications/delete.html',
+                               title=title,
+                               app=app,
+                               owner=owner,
+                               n_tasks=n_tasks,
+                               overall_progress=overall_progress,
+                               last_activity=last_activity)
+    # Clean cache
+    cached_apps.delete_app(app.short_name)
+    cached_apps.clean(app.id)
+    app = App.query.get(app.id)
+    db.session.delete(app)
+    db.session.commit()
+    flash(gettext('Project deleted!'), 'success')
+    return redirect(url_for('account.profile', name=current_user.name))
 
 
 @blueprint.route('/<short_name>/update', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def update(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks,
+     n_task_runs, overall_progress, last_activity) = app_by_shortname(short_name)
 
     def handle_valid_form(form):
         hidden = int(form.hidden.data)
 
-        new_info = {}
-        # Add the info items
-        app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
-        if form.thumbnail.data:
-            new_info['thumbnail'] = form.thumbnail.data
-        #if form.sched.data:
-        #    new_info['sched'] = form.sched.data
+        (app, owner, n_tasks, n_task_runs,
+         overall_progress, last_activity) = app_by_shortname(short_name)
 
-        # Merge info object
-        info = dict(app.info.items() + new_info.items())
-
-        new_application = model.App(
+        new_application = model.app.App(
             id=form.id.data,
             name=form.name.data,
             short_name=form.short_name.data,
             description=form.description.data,
             long_description=form.long_description.data,
             hidden=hidden,
-            info=info,
+            info=app.info,
             owner_id=app.owner_id,
             allow_anonymous_contributors=form.allow_anonymous_contributors.data,
             category_id=form.category_id.data)
 
-        app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+        new_application.set_password(form.password.data)
         db.session.merge(new_application)
         db.session.commit()
+        cached_apps.delete_app(short_name)
         cached_apps.reset()
         cached_cat.reset()
-        flash(gettext('Application updated!'), 'success')
+        cached_apps.get_app(new_application.short_name)
+        flash(gettext('Project updated!'), 'success')
         return redirect(url_for('.details',
                                 short_name=new_application.short_name))
 
-    try:
-        require.app.read(app)
-        require.app.update(app)
+    require.app.read(app)
+    require.app.update(app)
 
-        title = app_title(app, "Update")
-        if request.method == 'GET':
-            form = AppForm(obj=app)
-            categories = db.session.query(model.Category).all()
-            form.category_id.choices = [(c.id, c.name) for c in categories]
-            if app.category_id is None:
-                app.category_id = categories[0].id
-            form.populate_obj(app)
-            if app.info.get('thumbnail'):
-                form.thumbnail.data = app.info['thumbnail']
-            #if app.info.get('sched'):
-            #    for s in form.sched.choices:
-            #        if app.info['sched'] == s[0]:
-            #            form.sched.data = s[0]
-            #            break
+    title = app_title(app, "Update")
+    if request.method == 'GET':
+        form = AppUpdateForm(obj=app)
+        upload_form = AvatarUploadForm()
+        categories = db.session.query(model.category.Category).all()
+        form.category_id.choices = [(c.id, c.name) for c in categories]
+        if app.category_id is None:
+            app.category_id = categories[0].id
+        form.populate_obj(app)
 
-        if request.method == 'POST':
-            form = AppForm(request.form)
-            categories = cached_cat.get_all()
-            form.category_id.choices = [(c.id, c.name) for c in categories]
+    if request.method == 'POST':
+        upload_form = AvatarUploadForm()
+        form = AppUpdateForm(request.form)
+        categories = cached_cat.get_all()
+        form.category_id.choices = [(c.id, c.name) for c in categories]
+
+        if request.form.get('btn') != 'Upload':
             if form.validate():
                 return handle_valid_form(form)
             flash(gettext('Please correct the errors'), 'error')
-
-        return render_template('/applications/update.html',
-                               form=form,
-                               title=title,
-                               app=app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
         else:
-            raise
+            if upload_form.validate_on_submit():
+                app = App.query.get(app.id)
+                file = request.files['avatar']
+                coordinates = (upload_form.x1.data, upload_form.y1.data,
+                               upload_form.x2.data, upload_form.y2.data)
+                prefix = time.time()
+                file.filename = "app_%s_thumbnail_%i.png" % (app.id, prefix)
+                container = "user_%s" % current_user.id
+                uploader.upload_file(file,
+                                     container=container,
+                                     coordinates=coordinates)
+                # Delete previous avatar from storage
+                if app.info.get('thumbnail'):
+                    uploader.delete_file(app.info['thumbnail'], container)
+                app.info['thumbnail'] = file.filename
+                app.info['container'] = container
+                db.session.commit()
+                cached_apps.delete_app(app.short_name)
+                flash(gettext('Your project thumbnail has been updated! It may \
+                                  take some minutes to refresh...'), 'success')
+            else:
+                flash(gettext('You must provide a file to change the avatar'),
+                      'error')
+            return redirect(url_for('.update', short_name=short_name))
+
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+    return render_template('/applications/update.html',
+                           form=form,
+                           upload_form=upload_form,
+                           app=app,
+                           owner=owner,
+                           n_tasks=n_tasks,
+                           overall_progress=overall_progress,
+                           n_task_runs=n_task_runs,
+                           last_activity=last_activity,
+                           n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                           n_volunteers=cached_apps.n_volunteers(app.get('id')),
+                           title=title)
 
 
 @blueprint.route('/<short_name>/')
 def details(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
 
-    try:
-        require.app.read(app)
-        template = '/applications/app.html'
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    require.app.read(app)
+    template = '/applications/app.html'
+
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
 
     title = app_title(app, None)
-
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
     template_args = {"app": app, "title": title,
+                     "owner": owner,
                      "n_tasks": n_tasks,
                      "overall_progress": overall_progress,
-                     "last_activity": last_activity}
+                     "last_activity": last_activity,
+                     "n_completed_tasks": cached_apps.n_completed_tasks(app.get('id')),
+                     "n_volunteers": cached_apps.n_volunteers(app.get('id'))}
     if current_app.config.get('CKAN_URL'):
         template_args['ckan_name'] = current_app.config.get('CKAN_NAME')
         template_args['ckan_url'] = current_app.config.get('CKAN_URL')
@@ -539,24 +608,23 @@ def details(short_name):
 @login_required
 @admin_required
 def settings(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
 
     title = app_title(app, "Settings")
-    try:
-        require.app.read(app)
-        require.app.update(app)
-
-        return render_template('/applications/settings.html',
-                               app=app,
-                               n_tasks=n_tasks,
-                               overall_progress=overall_progress,
-                               last_activity=last_activity,
-                               title=title)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    require.app.read(app)
+    require.app.update(app)
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+    return render_template('/applications/settings.html',
+                           app=app,
+                           owner=owner,
+                           n_tasks=n_tasks,
+                           overall_progress=overall_progress,
+                           n_task_runs=n_task_runs,
+                           last_activity=last_activity,
+                           n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                           n_volunteers=cached_apps.n_volunteers(app.get('id')),
+                           title=title)
 
 
 def compute_importer_variant_pairs(forms):
@@ -566,7 +634,7 @@ def compute_importer_variant_pairs(forms):
     variants = reduce(operator.__add__,
                       [i.variants for i in forms.itervalues()],
                       [])
-    if len(variants) % 2:
+    if len(variants) % 2: # pragma: no cover
         variants.append("empty")
 
     prefix = "applications/tasks/"
@@ -581,18 +649,22 @@ def compute_importer_variant_pairs(forms):
 @login_required
 @admin_required
 def import_task(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    n_volunteers = cached_apps.n_volunteers(app.id)
+    n_completed_tasks = cached_apps.n_completed_tasks(app.id)
     title = app_title(app, "Import Tasks")
     loading_text = gettext("Importing tasks, this may take a while, wait...")
-    template_args = {"title": title, "app": app, "loading_text": loading_text}
-    try:
-        require.app.read(app)
-        require.app.update(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    dict_app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+    template_args = dict(title=title, loading_text=loading_text,
+                         app=dict_app,
+                         owner=owner,
+                         n_tasks=n_tasks,
+                         overall_progress=overall_progress,
+                         n_volunteers=n_volunteers,
+                         n_completed_tasks=n_completed_tasks)
+    require.app.read(app)
+    require.app.update(app)
 
     data_handlers = dict([
         (i.template_id, (i.form_detector, i(request.form), i.form_id))
@@ -611,7 +683,7 @@ def import_task(short_name):
         return render_template('/applications/import_options.html',
                                **template_args)
 
-    if template == 'gdocs':
+    if template == 'gdocs':  # pragma: no cover
         mode = request.args.get('mode')
         if mode is not None:
             template_args["gdform"].googledocs_url.data = importer.googledocs_urls[mode]
@@ -632,7 +704,7 @@ def import_task(short_name):
         tmpl = '/applications/importers/%s.html' % template
         return render_template(tmpl, **template_args)
 
-    if not (form and form.validate_on_submit()):
+    if not (form and form.validate_on_submit()):  # pragma: no cover
         return render_forms()
 
     return _import_task(app, handler, form, render_forms)
@@ -645,9 +717,9 @@ def _import_task(app, handler, form, render_forms):
         n_data = 0
         for task_data in handler.tasks(form):
             n_data += 1
-            task = model.Task(app_id=app.id)
+            task = model.task.Task(app_id=app.id)
             [setattr(task, k, v) for k, v in task_data.iteritems()]
-            data = db.session.query(model.Task).filter_by(app_id=app.id).filter_by(info=task.info).first()
+            data = db.session.query(model.task.Task).filter_by(app_id=app.id).filter_by(info=task.info).first()
             if data is None:
                 db.session.add(task)
                 db.session.commit()
@@ -670,30 +742,49 @@ def _import_task(app, handler, form, render_forms):
         return redirect(url_for('.tasks', short_name=app.short_name))
     except importer.BulkImportException, err_msg:
         flash(err_msg, 'error')
-    except Exception as inst:
+    except Exception as inst:  # pragma: no cover
         current_app.logger.error(inst)
         msg = 'Oops! Looks like there was an error with processing that file!'
         flash(gettext(msg), 'error')
     return render_forms()
 
 
+@blueprint.route('/<short_name>/password', methods=['GET', 'POST'])
+def password_required(short_name):
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    form = PasswordForm(request.form)
+    if request.method == 'POST' and form.validate():
+        password = request.form.get('password')
+        cookie_exp = current_app.config.get('PASSWD_COOKIE_TIMEOUT')
+        passwd_mngr = ProjectPasswdManager(CookieHandler(request, signer, cookie_exp))
+        if passwd_mngr.validates(password, app):
+            response = make_response(redirect(request.args.get('next')))
+            return passwd_mngr.update_response(response, app, get_user_id_or_ip())
+        flash('Sorry, incorrect password')
+    return render_template('applications/password.html',
+                            app=app,
+                            form=form,
+                            short_name=short_name,
+                            next=request.args.get('next'))
+
+
 @blueprint.route('/<short_name>/task/<int:task_id>')
 def task_presenter(short_name, task_id):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner,
+     n_tasks, n_task_runs, overall_progress, last_activity) = app_by_shortname(short_name)
     task = Task.query.filter_by(id=task_id).first_or_404()
-    try:
-        require.app.read(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
 
     if current_user.is_anonymous():
         if not app.allow_anonymous_contributors:
             msg = ("Oops! You have to sign in to participate in "
                    "<strong>%s</strong>"
-                   "application" % app.name)
+                   "project" % app.name)
             flash(gettext(msg), 'warning')
             return redirect(url_for('account.signin',
                                     next=url_for('.presenter',
@@ -713,7 +804,7 @@ def task_presenter(short_name, task_id):
             flash(msg_1 + "<a href=\"" + url + "\">Sign in now!</a>", "warning")
 
     title = app_title(app, "Contribute")
-    template_args = {"app": app, "title": title}
+    template_args = {"app": app, "title": title, "owner": owner}
 
     def respond(tmpl):
         return render_template(tmpl, **template_args)
@@ -724,15 +815,15 @@ def task_presenter(short_name, task_id):
     #return render_template('/applications/presenter.html', app = app)
     # Check if the user has submitted a task before
 
-    tr_search = db.session.query(model.TaskRun)\
-                  .filter(model.TaskRun.task_id == task_id)\
-                  .filter(model.TaskRun.app_id == app.id)
+    tr_search = db.session.query(model.task_run.TaskRun)\
+                  .filter(model.task_run.TaskRun.task_id == task_id)\
+                  .filter(model.task_run.TaskRun.app_id == app.id)
 
     if current_user.is_anonymous():
         remote_addr = request.remote_addr or "127.0.0.1"
-        tr = tr_search.filter(model.TaskRun.user_ip == remote_addr)
+        tr = tr_search.filter(model.task_run.TaskRun.user_ip == remote_addr)
     else:
-        tr = tr_search.filter(model.TaskRun.user_id == current_user.id)
+        tr = tr_search.filter(model.task_run.TaskRun.user_id == current_user.id)
 
     tr_first = tr.first()
     if tr_first is None:
@@ -744,27 +835,12 @@ def task_presenter(short_name, task_id):
 @blueprint.route('/<short_name>/presenter')
 @blueprint.route('/<short_name>/newtask')
 def presenter(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
-    title = app_title(app, "Contribute")
-    template_args = {"app": app, "title": title}
-    try:
-        require.app.read(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
 
-    if not app.allow_anonymous_contributors and current_user.is_anonymous():
-        msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
-               application" % app.name
-        flash(gettext(msg), 'warning')
-        return redirect(url_for('account.signin',
-                        next=url_for('.presenter', short_name=app.short_name)))
-
-    msg = "Ooops! You are an anonymous user and will not \
-           get any credit for your contributions. Sign in \
-           now!"
+    def invite_new_volunteers():
+        user_id = None if current_user.is_anonymous() else current_user.id
+        user_ip = request.remote_addr if current_user.is_anonymous() else None
+        task = sched.new_task(app.id, user_id, user_ip, 0)
+        return task is None and overall_progress < 100.0
 
     def respond(tmpl):
         if (current_user.is_anonymous()):
@@ -772,6 +848,27 @@ def presenter(short_name):
             flash(msg_1, "warning")
         resp = make_response(render_template(tmpl, **template_args))
         return resp
+
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    title = app_title(app, "Contribute")
+    template_args = {"app": app, "title": title, "owner": owner,
+                     "invite_new_volunteers": invite_new_volunteers()}
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
+
+    if not app.allow_anonymous_contributors and current_user.is_anonymous():
+        msg = "Oops! You have to sign in to participate in <strong>%s</strong> \
+               project" % app.name
+        flash(gettext(msg), 'warning')
+        return redirect(url_for('account.signin',
+                        next=url_for('.presenter', short_name=app.short_name)))
+
+    msg = "Ooops! You are an anonymous user and will not \
+           get any credit for your contributions. Sign in \
+           now!"
 
     if app.info.get("tutorial") and \
             request.cookies.get(app.short_name + "tutorial") is None:
@@ -786,16 +883,16 @@ def presenter(short_name):
 @login_required
 @admin_required
 def tutorial(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
     title = app_title(app, "Tutorial")
-    try:
-        require.app.read(app)
-    except HTTPException:
-        if app.hidden:
-            return abort(403)
-        else:
-            raise
-    return render_template('/applications/tutorial.html', title=title, app=app)
+
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
+    return render_template('/applications/tutorial.html', title=title,
+                           app=app, owner=owner)
 
 
 @blueprint.route('/<short_name>/<int:task_id>/results.json')
@@ -803,47 +900,57 @@ def tutorial(short_name):
 @admin_required
 def export(short_name, task_id):
     """Return a file with all the TaskRuns for a give Task"""
-    # Check if the app exists
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
     try:
-        require.app.read(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+        session = get_session(db, bind='slave')
+        # Check if the app exists
+        (app, owner, n_tasks, n_task_runs,
+         overall_progress, last_activity) = app_by_shortname(short_name)
 
-    # Check if the task belongs to the app and exists
-    task = db.session.query(model.Task).filter_by(app_id=app.id)\
-                                       .filter_by(id=task_id).first()
-    if task:
-        taskruns = db.session.query(model.TaskRun).filter_by(task_id=task_id)\
-                             .filter_by(app_id=app.id).all()
-        results = [tr.dictize() for tr in taskruns]
-        return Response(json.dumps(results), mimetype='application/json')
-    else:
-        return abort(404)
+        require.app.read(app)
+        redirect_to_password = _check_if_redirect_to_password(app)
+        if redirect_to_password:
+            return redirect_to_password
+
+        # Check if the task belongs to the app and exists
+        task = session.query(model.task.Task).filter_by(app_id=app.id)\
+                                             .filter_by(id=task_id).first()
+        if task:
+            taskruns = session.query(model.task_run.TaskRun).filter_by(task_id=task_id)\
+                              .filter_by(app_id=app.id).all()
+            results = [tr.dictize() for tr in taskruns]
+            return Response(json.dumps(results), mimetype='application/json')
+        else:
+            return abort(404)
+    except: # pragma: no cover
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 @blueprint.route('/<short_name>/tasks/')
 @login_required
 @admin_required
 def tasks(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
     title = app_title(app, "Tasks")
-    try:
-        require.app.read(app)
-        return render_template('/applications/tasks.html',
-                               title=title,
-                               app=app,
-                               n_tasks=n_tasks,
-                               overall_progress=overall_progress,
-                               last_activity=last_activity)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+
+    return render_template('/applications/tasks.html',
+                           title=title,
+                           app=app,
+                           owner=owner,
+                           n_tasks=n_tasks,
+                           overall_progress=overall_progress,
+                           last_activity=last_activity,
+                           n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                           n_volunteers=cached_apps.n_volunteers(app.get('id')))
 
 
 @blueprint.route('/<short_name>/tasks/browse', defaults={'page': 1})
@@ -851,72 +958,90 @@ def tasks(short_name):
 @login_required
 @admin_required
 def tasks_browse(short_name, page):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
     title = app_title(app, "Tasks")
+    n_volunteers = cached_apps.n_volunteers(app.id)
+    n_completed_tasks = cached_apps.n_completed_tasks(app.id)
 
     def respond():
-        per_page = 10
-        count = db.session.query(model.Task)\
-            .filter_by(app_id=app.id)\
-            .count()
-        app_tasks = db.session.query(model.Task)\
-            .filter_by(app_id=app.id)\
-            .order_by(model.Task.id)\
-            .limit(per_page)\
-            .offset((page - 1) * per_page)\
-            .all()
+        try:
+            session = get_session(db, bind='slave')
+            per_page = 10
+            count = session.query(model.task.Task)\
+                .filter_by(app_id=app.get('id'))\
+                .count()
+            app_tasks = session.query(model.task.Task)\
+                .filter_by(app_id=app.get('id'))\
+                .order_by(model.task.Task.id)\
+                .limit(per_page)\
+                .offset((page - 1) * per_page)\
+                .all()
 
-        if not app_tasks and page != 1:
-            abort(404)
+            if not app_tasks and page != 1:
+                abort(404)
 
-        pagination = Pagination(page, per_page, count)
-        return render_template('/applications/tasks_browse.html',
-                               app=app,
-                               tasks=app_tasks,
-                               title=title,
-                               pagination=pagination)
-
-    try:
-        require.app.read(app)
-        return respond()
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
+            pagination = Pagination(page, per_page, count)
+            return render_template('/applications/tasks_browse.html',
+                                   app=app,
+                                   owner=owner,
+                                   tasks=app_tasks,
+                                   title=title,
+                                   pagination=pagination,
+                                   n_tasks=n_tasks,
+                                   overall_progress=overall_progress,
+                                   n_volunteers=n_volunteers,
+                                   n_completed_tasks=n_completed_tasks)
+        except: # pragma: no cover
+            session.rollback()
             raise
+        finally:
+            session.close()
+
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+    return respond()
 
 
 @blueprint.route('/<short_name>/tasks/delete', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def delete_tasks(short_name):
-    """Delete ALL the tasks for a given application"""
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
-    try:
-        require.app.read(app)
-        require.app.update(app)
-        if request.method == 'GET':
-            title = app_title(app, "Delete")
-            return render_template('applications/tasks/delete.html',
-                                   app=app,
-                                   n_tasks=n_tasks,
-                                   overall_progress=overall_progress,
-                                   last_activity=last_activity,
-                                   title=title)
-        else:
-            tasks = db.session.query(model.Task).filter_by(app_id=app.id).all()
-            for t in tasks:
-                db.session.delete(t)
-            db.session.commit()
-            msg = gettext("All the tasks and associated task runs have been deleted")
-            flash(msg, 'success')
-            cached_apps.delete_last_activity(app.id)
-            cached_apps.delete_n_tasks(app.id)
-            cached_apps.delete_n_task_runs(app.id)
-            cached_apps.delete_overall_progress(app.id)
-            return redirect(url_for('.tasks', short_name=app.short_name))
-    except HTTPException:
-        return abort(403)
+    """Delete ALL the tasks for a given project"""
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    require.app.read(app)
+    require.app.update(app)
+    if request.method == 'GET':
+        title = app_title(app, "Delete")
+        n_volunteers = cached_apps.n_volunteers(app.id)
+        n_completed_tasks = cached_apps.n_completed_tasks(app.id)
+        app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+        return render_template('applications/tasks/delete.html',
+                               app=app,
+                               owner=owner,
+                               n_tasks=n_tasks,
+                               n_task_runs=n_task_runs,
+                               n_volunteers=n_volunteers,
+                               n_completed_tasks=n_completed_tasks,
+                               overall_progress=overall_progress,
+                               last_activity=last_activity,
+                               title=title)
+    else:
+        tasks = db.session.query(model.task.Task).filter_by(app_id=app.id).all()
+        for t in tasks:
+            db.session.delete(t)
+        db.session.commit()
+        msg = gettext("All the tasks and associated task runs have been deleted")
+        flash(msg, 'success')
+        cached_apps.delete_last_activity(app.id)
+        cached_apps.delete_n_tasks(app.id)
+        cached_apps.delete_n_task_runs(app.id)
+        cached_apps.delete_overall_progress(app.id)
+        return redirect(url_for('.tasks', short_name=app.short_name))
 
 
 @blueprint.route('/<short_name>/tasks/export')
@@ -924,76 +1049,119 @@ def delete_tasks(short_name):
 @admin_required
 def export_to(short_name):
     """Export Tasks and TaskRuns in the given format"""
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    n_volunteers = cached_apps.n_volunteers(app.id)
+    n_completed_tasks = cached_apps.n_completed_tasks(app.id)
     title = app_title(app, gettext("Export"))
     loading_text = gettext("Exporting data..., this may take a while")
 
-    try:
-        require.app.read(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
 
     def respond():
         return render_template('/applications/export.html',
                                title=title,
                                loading_text=loading_text,
-                               app=app)
+                               ckan_name=current_app.config.get('CKAN_NAME'),
+                               app=app,
+                               owner=owner,
+                               n_tasks=n_tasks,
+                               n_task_runs=n_task_runs,
+                               n_volunteers=n_volunteers,
+                               n_completed_tasks=n_completed_tasks,
+                               overall_progress=overall_progress)
+
 
     def gen_json(table):
-        n = db.session.query(table)\
-            .filter_by(app_id=app.id).count()
-        sep = ", "
-        yield "["
-        for i, tr in enumerate(db.session.query(table)
-                                 .filter_by(app_id=app.id).yield_per(1), 1):
-            item = json.dumps(tr.dictize())
-            if (i == n):
-                sep = ""
-            yield item + sep
-        yield "]"
+        try:
+            session = get_session(db, bind='slave')
+            n = session.query(table)\
+                .filter_by(app_id=app.id).count()
+            sep = ", "
+            yield "["
+            for i, tr in enumerate(session.query(table)
+                                     .filter_by(app_id=app.id).yield_per(1), 1):
+                item = json.dumps(tr.dictize())
+                if (i == n):
+                    sep = ""
+                yield item + sep
+            yield "]"
+        except: # pragma: no cover
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
-    def format_csv_properly(row):
-        keys = sorted(row.keys())
+    def format_csv_properly(row, ty=None):
+        tmp = row.keys()
+        task_keys = []
+        for k in tmp:
+            k = "%s__%s" % (ty, k)
+            task_keys.append(k)
+        if (type(row['info']) == dict):
+            task_info_keys = []
+            tmp = row['info'].keys()
+            for k in tmp:
+                k = "%sinfo__%s" % (ty, k)
+                task_info_keys.append(k)
+        else:
+            task_info_keys = []
+
+        keys = sorted(task_keys + task_info_keys)
         values = []
+        _prefix = "%sinfo" % ty
         for k in keys:
-            values.append(row[k])
+            prefix, k = k.split("__")
+            if prefix == _prefix:
+                if row['info'].get(k) is not None:
+                    values.append(row['info'][k])
+                else:
+                    values.append(None)
+            else:
+                if row.get(k) is not None:
+                    values.append(row[k])
+                else:
+                    values.append(None)
+
         return values
 
-
     def handle_task(writer, t):
-        if (type(t.info) == dict):
-            values = format_csv_properly(t.info)
-            writer.writerow(values)
-        else:
-            writer.writerow([t.info()])
+        writer.writerow(format_csv_properly(t.dictize(), ty='task'))
 
     def handle_task_run(writer, t):
-        if (type(t.info) == dict):
-            values = format_csv_properly(t.info)
-            writer.writerow(values)
-        else:
-            writer.writerow([t.info])
+        writer.writerow(format_csv_properly(t.dictize(), ty='taskrun'))
 
     def get_csv(out, writer, table, handle_row):
-        for tr in db.session.query(table)\
-                .filter_by(app_id=app.id)\
-                .yield_per(1):
-            handle_row(writer, tr)
-        yield out.getvalue()
+        try:
+            session = get_session(db, bind='slave')
+            for tr in session.query(table)\
+                    .filter_by(app_id=app.id)\
+                    .yield_per(1):
+                handle_row(writer, tr)
+            yield out.getvalue()
+        except: # pragma: no cover
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     def respond_json(ty):
-        tables = {"task": model.Task, "task_run": model.TaskRun}
+        tables = {"task": model.task.Task, "task_run": model.task_run.TaskRun}
         try:
             table = tables[ty]
         except KeyError:
             return abort(404)
-        return Response(gen_json(table), mimetype='application/json')
+
+        tmp = 'attachment; filename=%s_%s.json' % (app.short_name, ty)
+        res = Response(gen_json(table), mimetype='application/json')
+        res.headers['Content-Disposition'] = tmp
+        return res
 
     def create_ckan_datastore(ckan, table, package_id):
-        tables = {"task": model.Task, "task_run": model.TaskRun}
+        tables = {"task": model.task.Task, "task_run": model.task_run.TaskRun}
         new_resource = ckan.resource_create(name=table,
                                             package_id=package_id)
         ckan.datastore_create(name=table,
@@ -1004,7 +1172,7 @@ def export_to(short_name):
 
     def respond_ckan(ty):
         # First check if there is a package (dataset) in CKAN
-        tables = {"task": model.Task, "task_run": model.TaskRun}
+        tables = {"task": model.task.Task, "task_run": model.task_run.TaskRun}
         msg_1 = gettext("Data exported to ")
         msg = msg_1 + "%s ..." % current_app.config['CKAN_URL']
         ckan = Ckan(url=current_app.config['CKAN_URL'],
@@ -1020,9 +1188,9 @@ def export_to(short_name):
                 owner = User.query.get(app.owner_id)
                 package = ckan.package_update(app=app, user=owner, url=app_url,
                                               resources=package['resources'])
+
                 ckan.package = package
                 resource_found = False
-                print len(package['resources'])
                 for r in package['resources']:
                     if r['name'] == ty:
                         ckan.datastore_delete(name=ty, resource_id=r['id'])
@@ -1038,13 +1206,6 @@ def export_to(short_name):
                 owner = User.query.get(app.owner_id)
                 package = ckan.package_create(app=app, user=owner, url=app_url)
                 create_ckan_datastore(ckan, ty, package['id'])
-                #new_resource = ckan.resource_create(name=ty,
-                #                                    package_id=package['id'])
-                #ckan.datastore_create(name=ty,
-                #                      resource_id=new_resource['result']['id'])
-                #ckan.datastore_upsert(name=ty,
-                #                     records=gen_json(tables[ty]),
-                #                     resource_id=new_resource['result']['id'])
             flash(msg, 'success')
             return respond()
         except requests.exceptions.ConnectionError:
@@ -1055,7 +1216,7 @@ def export_to(short_name):
             if len(inst.args) == 3:
                 t, msg, status_code = inst.args
                 msg = ("Error: %s with status code: %s" % (t, status_code))
-            else:
+            else: # pragma: no cover
                 msg = ("Error: %s" % inst.args[0])
             current_app.logger.error(msg)
             flash(msg, 'danger')
@@ -1063,39 +1224,63 @@ def export_to(short_name):
             return respond()
 
     def respond_csv(ty):
-        # Export Task(/Runs) to CSV
-        types = {
-            "task": (
-                model.Task, handle_task,
-                (lambda x: True),
-                gettext(
-                    "Oops, the application does not have tasks to \
-                    export, if you are the owner add some tasks")),
-            "task_run": (
-                model.TaskRun, handle_task_run,
-                (lambda x: type(x.info) == dict),
-                gettext(
-                    "Oops, there are no Task Runs yet to export, invite \
-                     some users to participate"))}
         try:
-            table, handle_row, test, msg = types[ty]
-        except KeyError:
-            return abort(404)
+            session = get_session(db, bind='slave')
+            # Export Task(/Runs) to CSV
+            types = {
+                "task": (
+                    model.task.Task, handle_task,
+                    (lambda x: True),
+                    gettext(
+                        "Oops, the project does not have tasks to \
+                        export, if you are the owner add some tasks")),
+                "task_run": (
+                    model.task_run.TaskRun, handle_task_run,
+                    (lambda x: True),
+                    gettext(
+                        "Oops, there are no Task Runs yet to export, invite \
+                         some users to participate"))}
+            try:
+                table, handle_row, test, msg = types[ty]
+            except KeyError:
+                return abort(404)
 
-        out = StringIO()
-        writer = UnicodeWriter(out)
-        t = db.session.query(table)\
-            .filter_by(app_id=app.id)\
-            .first()
-        if t is not None:
-            if test(t):
-                writer.writerow(sorted(t.info.keys()))
+            out = StringIO()
+            writer = UnicodeWriter(out)
+            t = session.query(table)\
+                .filter_by(app_id=app.id)\
+                .first()
+            if t is not None:
+                if test(t):
+                    tmp = t.dictize().keys()
+                    task_keys = []
+                    for k in tmp:
+                        k = "%s__%s" % (ty, k)
+                        task_keys.append(k)
+                    if (type(t.info) == dict):
+                        task_info_keys = []
+                        tmp = t.info.keys()
+                        for k in tmp:
+                            k = "%sinfo__%s" % (ty, k)
+                            task_info_keys.append(k)
+                    else:
+                        task_info_keys = []
+                    keys = task_keys + task_info_keys
+                    writer.writerow(sorted(keys))
 
-            return Response(get_csv(out, writer, table, handle_row),
-                            mimetype='text/csv')
-        else:
-            flash(msg, 'info')
-            return respond()
+                res = Response(get_csv(out, writer, table, handle_row),
+                               mimetype='text/csv')
+                tmp = 'attachment; filename=%s_%s.csv' % (app.short_name, ty)
+                res.headers['Content-Disposition'] = tmp
+                return res
+            else:
+                flash(msg, 'info')
+                return respond()
+        except: # pragma: no cover
+            session.rollback()
+            raise
+        finally:
+            session.close()
 
     export_formats = ["json", "csv"]
     if current_user.is_authenticated():
@@ -1107,13 +1292,20 @@ def export_to(short_name):
     if not (fmt and ty):
         if len(request.args) >= 1:
             abort(404)
+        app = add_custom_contrib_button_to(app, get_user_id_or_ip())
         return render_template('/applications/export.html',
                                title=title,
                                loading_text=loading_text,
                                ckan_name=current_app.config.get('CKAN_NAME'),
-                               app=app)
+                               app=app,
+                               owner=owner,
+                               n_tasks=n_tasks,
+                               n_task_runs=n_task_runs,
+                               n_volunteers=n_volunteers,
+                               n_completed_tasks=n_completed_tasks,
+                               overall_progress=overall_progress)
     if fmt not in export_formats:
-        abort(404)
+        abort(415)
     return {"json": respond_json, "csv": respond_csv, 'ckan': respond_ckan}[fmt](ty)
 
 
@@ -1122,21 +1314,27 @@ def export_to(short_name):
 @admin_required
 def show_stats(short_name):
     """Returns App Stats"""
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    n_volunteers = cached_apps.n_volunteers(app.id)
+    n_completed_tasks = cached_apps.n_completed_tasks(app.id)
     title = app_title(app, "Statistics")
 
-    try:
-        require.app.read(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    require.app.read(app)
+    redirect_to_password = _check_if_redirect_to_password(app)
+    if redirect_to_password:
+        return redirect_to_password
 
     if not ((n_tasks > 0) and (n_task_runs > 0)):
+        app = add_custom_contrib_button_to(app, get_user_id_or_ip())
         return render_template('/applications/non_stats.html',
                                title=title,
-                               app=app)
+                               app=app,
+                               owner=owner,
+                               n_tasks=n_tasks,
+                               overall_progress=overall_progress,
+                               n_volunteers=n_volunteers,
+                               n_completed_tasks=n_completed_tasks)
 
     dates_stats, hours_stats, users_stats = stats.get_stats(
         app.id,
@@ -1162,68 +1360,96 @@ def show_stats(short_name):
                dayStats=dates_stats,
                hourStats=hours_stats)
 
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
     return render_template('/applications/stats.html',
                            title=title,
                            appStats=json.dumps(tmp),
                            userStats=userStats,
-                           app=app)
+                           app=app,
+                           owner=owner,
+                           n_tasks=n_tasks,
+                           overall_progress=overall_progress,
+                           n_volunteers=n_volunteers,
+                           n_completed_tasks=n_completed_tasks)
 
 
 @blueprint.route('/<short_name>/tasks/settings')
 @login_required
 @admin_required
 def task_settings(short_name):
-    """Settings page for tasks of the application"""
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
-    try:
-        require.app.read(app)
-        require.app.update(app)
-        return render_template('applications/task_settings.html',
-                               app=app)
-    except:
-        return abort(403)
+    """Settings page for tasks of the project"""
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+    n_volunteers = cached_apps.n_volunteers(app.id)
+    n_completed_tasks = cached_apps.n_completed_tasks(app.id)
+    require.app.read(app)
+    require.app.update(app)
+    app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+    return render_template('applications/task_settings.html',
+                           app=app,
+                           owner=owner,
+                           n_tasks=n_tasks,
+                           overall_progress=overall_progress,
+                           n_volunteers=n_volunteers,
+                           n_completed_tasks=n_completed_tasks)
 
 
 @blueprint.route('/<short_name>/tasks/redundancy', methods=['GET', 'POST'])
 @login_required
 def task_n_answers(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
     title = app_title(app, gettext('Redundancy'))
     form = TaskRedundancyForm()
-    try:
-        require.app.read(app)
-        require.app.update(app)
-        if request.method == 'GET':
-            return render_template('/applications/task_n_answers.html',
-                                   title=title,
-                                   form=form,
-                                   app=app)
-        elif request.method == 'POST' and form.validate():
-            sql = text('''
-                       UPDATE task SET n_answers=:n_answers,
-                       state='ongoing' WHERE app_id=:app_id''')
-            db.engine.execute(sql, n_answers=form.n_answers.data, app_id=app.id)
-            msg = gettext('Redundancy of Tasks updated!')
-            flash(msg, 'success')
-            return redirect(url_for('.tasks', short_name=app.short_name))
-        else:
-            flash(gettext('Please correct the errors'), 'error')
-            return render_template('/applications/task_n_answers.html',
-                                   title=title,
-                                   form=form,
-                                   app=app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+    require.app.read(app)
+    require.app.update(app)
+    if request.method == 'GET':
+        return render_template('/applications/task_n_answers.html',
+                               title=title,
+                               form=form,
+                               app=app,
+                               owner=owner)
+    elif request.method == 'POST' and form.validate():
+        sql = text('''
+                   UPDATE task SET n_answers=:n_answers,
+                   state='ongoing' WHERE app_id=:app_id''').execution_options(autocommit=True)
+
+        db.session.execute(sql, dict(n_answers=form.n_answers.data, app_id=app.id))
+
+        # Update task.state according to their new n_answers value
+        sql = text('''
+                   WITH myquery AS (
+                   SELECT task.id, task.n_answers,
+                   COUNT(task_run.id) AS n_task_runs, task.state
+                   FROM task, task_run
+                   WHERE task_run.task_id=task.id AND task.app_id=:app_id
+                   GROUP BY task.id)
+                   UPDATE task SET state='completed'
+                   FROM myquery
+                   WHERE (myquery.n_task_runs >=:n_answers)
+                   and myquery.id=task.id
+                   ''').execution_options(autocommit=True)
+
+        db.session.execute(sql, dict(n_answers=form.n_answers.data, app_id=app.id))
+
+        msg = gettext('Redundancy of Tasks updated!')
+        flash(msg, 'success')
+        return redirect(url_for('.tasks', short_name=app.short_name))
+    else:
+        flash(gettext('Please correct the errors'), 'error')
+        return render_template('/applications/task_n_answers.html',
+                               title=title,
+                               form=form,
+                               app=app,
+                               owner=owner)
 
 
 @blueprint.route('/<short_name>/tasks/scheduler', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def task_scheduler(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
     title = app_title(app, gettext('Task Scheduler'))
     form = TaskSchedulerForm()
 
@@ -1231,15 +1457,10 @@ def task_scheduler(short_name):
         return render_template('/applications/task_scheduler.html',
                                title=title,
                                form=form,
-                               app=app)
-    try:
-        require.app.read(app)
-        require.app.update(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+                               app=app,
+                               owner=owner)
+    require.app.read(app)
+    require.app.update(app)
 
     if request.method == 'GET':
         if app.info.get('sched'):
@@ -1256,19 +1477,20 @@ def task_scheduler(short_name):
         db.session.add(app)
         db.session.commit()
         cached_apps.delete_app(app.short_name)
-        msg = gettext("Application Task Scheduler updated!")
+        msg = gettext("Project Task Scheduler updated!")
         flash(msg, 'success')
         return redirect(url_for('.tasks', short_name=app.short_name))
-
-    flash(gettext('Please correct the errors'), 'error')
-    return respond()
+    else: # pragma: no cover
+        flash(gettext('Please correct the errors'), 'error')
+        return respond()
 
 
 @blueprint.route('/<short_name>/tasks/priority', methods=['GET', 'POST'])
 @login_required
 @admin_required
 def task_priority(short_name):
-    app, n_tasks, n_task_runs, overall_progress, last_activity = app_by_shortname(short_name)
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
     title = app_title(app, gettext('Task Priority'))
     form = TaskPriorityForm()
 
@@ -1276,15 +1498,10 @@ def task_priority(short_name):
         return render_template('/applications/task_priority.html',
                                title=title,
                                form=form,
-                               app=app)
-    try:
-        require.app.read(app)
-        require.app.update(app)
-    except HTTPException:
-        if app.hidden:
-            raise abort(403)
-        else:
-            raise
+                               app=app,
+                               owner=owner)
+    require.app.read(app)
+    require.app.update(app)
 
     if request.method == 'GET':
         return respond()
@@ -1292,12 +1509,12 @@ def task_priority(short_name):
         tasks = []
         for task_id in form.task_ids.data.split(","):
             if task_id != '':
-                t = db.session.query(model.Task).filter_by(app_id=app.id)\
+                t = db.session.query(model.task.Task).filter_by(app_id=app.id)\
                               .filter_by(id=int(task_id)).first()
                 if t:
                     t.priority_0 = form.priority_0.data
                     tasks.append(t)
-                else:
+                else:  # pragma: no cover
                     flash(gettext(("Ooops, Task.id=%s does not belong to the app" % task_id)), 'danger')
         db.session.add_all(tasks)
         db.session.commit()
@@ -1307,3 +1524,183 @@ def task_priority(short_name):
     else:
         flash(gettext('Please correct the errors'), 'error')
         return respond()
+
+
+@blueprint.route('/<short_name>/blog')
+def show_blogposts(short_name):
+    try:
+        session = get_session(db, bind='slave')
+        (app, owner, n_tasks, n_task_runs,
+         overall_progress, last_activity) = app_by_shortname(short_name)
+
+        blogposts = session.query(model.blogpost.Blogpost).filter_by(app_id=app.id).all()
+        require.blogpost.read(app_id=app.id)
+        redirect_to_password = _check_if_redirect_to_password(app)
+        if redirect_to_password:
+            return redirect_to_password
+        app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+        return render_template('applications/blog.html', app=app,
+                               owner=owner, blogposts=blogposts,
+                               overall_progress=overall_progress,
+                               n_tasks=n_tasks,
+                               n_task_runs=n_task_runs,
+                               n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                               n_volunteers=cached_apps.n_volunteers(app.get('id')))
+    except: # pragma: no cover
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@blueprint.route('/<short_name>/<int:id>')
+def show_blogpost(short_name, id):
+    try:
+        session = get_session(db, bind='slave')
+        (app, owner, n_tasks, n_task_runs,
+         overall_progress, last_activity) = app_by_shortname(short_name)
+        blogpost = session.query(model.blogpost.Blogpost).filter_by(id=id,
+                                                            app_id=app.id).first()
+        if blogpost is None:
+            raise abort(404)
+        require.blogpost.read(blogpost)
+        redirect_to_password = _check_if_redirect_to_password(app)
+        if redirect_to_password:
+            return redirect_to_password
+        app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+        return render_template('applications/blog_post.html',
+                                app=app,
+                                owner=owner,
+                                blogpost=blogpost,
+                                overall_progress=overall_progress,
+                                n_tasks=n_tasks,
+                                n_task_runs=n_task_runs,
+                                n_completed_tasks=cached_apps.n_completed_tasks(app.get('id')),
+                                n_volunteers=cached_apps.n_volunteers(app.get('id')))
+    except: # pragma: no cover
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@blueprint.route('/<short_name>/new-blogpost', methods=['GET', 'POST'])
+@login_required
+def new_blogpost(short_name):
+
+    def respond():
+        dict_app = add_custom_contrib_button_to(app, get_user_id_or_ip())
+        return render_template('applications/new_blogpost.html',
+                               title=gettext("Write a new post"),
+                               form=form,
+                               app=dict_app,
+                               owner=owner,
+                               overall_progress=overall_progress,
+                               n_tasks=n_tasks,
+                               n_task_runs=n_task_runs,
+                               n_completed_tasks=cached_apps.n_completed_tasks(dict_app.get('id')),
+                               n_volunteers=cached_apps.n_volunteers(dict_app.get('id')))
+
+
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+
+    form = BlogpostForm(request.form)
+    del form.id
+
+    if request.method != 'POST':
+        require.blogpost.create(app_id=app.id)
+        return respond()
+
+    if not form.validate():
+        flash(gettext('Please correct the errors'), 'error')
+        return respond()
+
+    blogpost = model.blogpost.Blogpost(title=form.title.data,
+                                body=form.body.data,
+                                user_id=current_user.id,
+                                app_id=app.id)
+    require.blogpost.create(blogpost)
+    db.session.add(blogpost)
+    db.session.commit()
+    cached_apps.delete_app(short_name)
+
+    msg_1 = gettext('Blog post created!')
+    flash('<i class="icon-ok"></i> ' + msg_1, 'success')
+
+    return redirect(url_for('.show_blogposts', short_name=short_name))
+
+
+@blueprint.route('/<short_name>/<int:id>/update', methods=['GET', 'POST'])
+@login_required
+def update_blogpost(short_name, id):
+    (app, owner, n_tasks, n_task_runs,
+     overall_progress, last_activity) = app_by_shortname(short_name)
+
+    blogpost = db.session.query(model.blogpost.Blogpost).filter_by(id=id,
+                                                        app_id=app.id).first()
+    if blogpost is None:
+        raise abort(404)
+
+    def respond():
+        return render_template('applications/update_blogpost.html',
+                               title=gettext("Edit a post"),
+                               form=form, app=app, owner=owner,
+                               blogpost=blogpost,
+                               overall_progress=overall_progress,
+                               n_task_runs=n_task_runs,
+                               n_completed_tasks=cached_apps.n_completed_tasks(app.id),
+                               n_volunteers=cached_apps.n_volunteers(app.id))
+
+    form = BlogpostForm()
+
+    if request.method != 'POST':
+        require.blogpost.update(blogpost)
+        form = BlogpostForm(obj=blogpost)
+        return respond()
+
+    if not form.validate():
+        flash(gettext('Please correct the errors'), 'error')
+        return respond()
+
+    require.blogpost.update(blogpost)
+    blogpost = model.blogpost.Blogpost(id=form.id.data,
+                                title=form.title.data,
+                                body=form.body.data,
+                                user_id=current_user.id,
+                                app_id=app.id)
+    db.session.merge(blogpost)
+    db.session.commit()
+    cached_apps.delete_app(short_name)
+
+    msg_1 = gettext('Blog post updated!')
+    flash('<i class="icon-ok"></i> ' + msg_1, 'success')
+
+    return redirect(url_for('.show_blogposts', short_name=short_name))
+
+
+@blueprint.route('/<short_name>/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_blogpost(short_name, id):
+    app = app_by_shortname(short_name)[0]
+    blogpost = db.session.query(model.blogpost.Blogpost).filter_by(id=id,
+                                                        app_id=app.id).first()
+    if blogpost is None:
+        raise abort(404)
+
+    require.blogpost.delete(blogpost)
+    db.session.delete(blogpost)
+    db.session.commit()
+    cached_apps.delete_app(short_name)
+    flash('<i class="icon-ok"></i> ' + 'Blog post deleted!', 'success')
+    return redirect(url_for('.show_blogposts', short_name=short_name))
+
+
+
+def _check_if_redirect_to_password(app):
+    cookie_exp = current_app.config.get('PASSWD_COOKIE_TIMEOUT')
+    passwd_mngr = ProjectPasswdManager(CookieHandler(request, signer, cookie_exp))
+    if passwd_mngr.password_needed(app, get_user_id_or_ip()):
+        return redirect(url_for('.password_required',
+                                 short_name=app.short_name, next=request.path))
+

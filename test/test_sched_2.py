@@ -17,7 +17,7 @@
 # along with PyBossa.  If not, see <http://www.gnu.org/licenses/>.
 
 from helper import sched
-from base import Fixtures, redis_flushall
+from default import with_context
 import json
 
 
@@ -27,18 +27,18 @@ class TestSched(sched.Helper):
         self.endpoints = ['app', 'task', 'taskrun']
 
     # Tests
+    @with_context
     def test_incremental_tasks(self):
         """ Test incremental SCHED strategy - second TaskRun receives first gaven answer"""
-        redis_flushall()
-        Fixtures.create_2(sched='incremental')
+        self.create_2(sched='incremental')
 
         # Del previous TaskRuns
         self.del_task_runs()
 
         # Register
-        self.register(fullname=self.user.fullname, username=self.user.username,
+        self.register(fullname=self.user.fullname, name=self.user.username,
                       password=self.user.password)
-        self.register(fullname="Marie Doe", username="mariedoe", password="dr0wss4p")
+        self.register(fullname="Marie Doe", name="mariedoe", password="dr0wss4p")
         self.signin()
 
         # Get the only task with no runs!

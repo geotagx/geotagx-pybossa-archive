@@ -24,6 +24,18 @@ PyBossa server
 
 .. _documentation: http://flask.pocoo.org/docs/quickstart/#debug-mode
 
+Debug Toolbar
+~~~~~~~~~~~~~
+
+PyBossa includes a flag to enable a debug toolbar that can give your more
+insights about the performance of PyBossa. We strongly recommend to keep the
+toolbar disabled in production environments, as it will slow down considerably
+all the execution of the code. However, if you are testing the server, feel
+free to enable it adding the following variable to the settings file::
+
+    ENABLE_DEBUG_TOOLBAR = True
+
+
 Host and Port
 =============
 
@@ -64,6 +76,22 @@ so it fits your needs in the field `SQLALCHEMY_DATABASE_URI`_::
 .. _`SQLALCHEMY_DATABSE_URI`: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L10
 .. _SQLAlchemy: http://www.sqlalchemy.org/
 
+Load balance SQL Queries
+========================
+
+If you have a master/slave PostgreSQL setup, you can instruct PyBossa to use
+the slave node for load balancing queries between the master and slave node.
+
+For enabling this mode, all you have to do is adding to the settings_local.py
+config file the following:
+
+.. code-block:: python
+
+    SQLALCHEMY_BINDS = {
+        'slave': 'postgresql://user:password@server/pybossadb'
+    }
+
+
 It's dangerous, so better sign this
 ===================================
 
@@ -98,6 +126,42 @@ logo name is, **my_brand.png** the LOGO_ variable should be updated with the
 name of the file.
 
 .. _LOGO: https://github.com/PyBossa/pybossa/blob/master/settings_local.py.tmpl#L17
+
+Creating your own theme
+=======================
+
+PyBossa supports themes. By default, it provides its own theme that you can use
+or if you prefer, copy it and create your own. The default theme for PyBossa is
+available in the `repository pybossa-default-theme`_.
+
+In order to create your theme, all you have to do is to fork the default theme
+to your own account, and then start modifying it. A theme has a very simple
+structure:
+
+* info.json: this file includes some information about the author, license and
+  name.
+* static: this folder has all the CSS, JavaScript, images, etc. In other words,
+  the static content.
+* templates: this folder has the templates for PyBossa.
+
+Therefore, if you want to change the look and feel (i.e. colors of the top bar)
+all you have to do is to modify the styles.css file of the static folder. Or
+if you prefer, create your own.
+
+However, if you want to modify the structure, let's say you want to change the
+order of the elements of the navigation bar: the first element should be the
+About link, then you will have to modify the files included in the templates
+folder.
+
+As you can see, you will be able to give a full personality to your own PyBossa
+server without problems.
+
+.. note::
+    You can specify a different amount of apps per page if you want. Change the
+    default value in your settings_local.py file of APPS_PER_PAGE to the number
+    that you want. By default it gives you access to 20.
+
+.. _`repository pybossa-default-theme`: https://github.com/PyBossa/pybossa-default-theme
 
 Adding your Contact Information
 ===============================
@@ -206,8 +270,8 @@ you to send messages to the following type of users:
 
  * **Authenticated users**, basically all the registered users in the server.
  * **Admin users**, all the users that are admins/root in the server.
- * **Application owners**, all the users that have created one or more
-   applications in the server.
+ * **Project owners**, all the users that have created one or more
+   projects in the server.
 
 Therefore, let's say that you want to warn all your admins that a new
 configuration will be deployed in your system. In this case, all you have to do
@@ -227,28 +291,99 @@ supported keys are:
 
  * **admin**: for admin users
  * **user**: for all the registered users (even admins)
- * **owner**: for all registered users that have one or more applications
+ * **owner**: for all registered users that have one or more projects
 
 .. note::
     
     You can use a mix of messages at the same time without problems, so for
     example you can display a message for Admins and Owners at the same time.
 
-Enabling a Cache
-================
+Cache
+=====
 
-PyBossa comes with a Cache system (based on `flask-cache <http://packages.python.org/Flask-Cache/>`_) that it is
-disabled by default. If you want to start caching some pages of the PyBossa server, you
-only have to modify your settings and change the following value from::
+By default PyBossa uses Redis to cache a lot of data in order to serve it as
+fast as possible. PyBossa comes with a default set of timeouts for different
+views that you can change or modify to your own taste. All you have to do is
+modify the following variables in your settings file::
 
-    CACHE_TYPE = 'null'
+    # App cache
+    APP_TIMEOUT = 15 * 60
+    REGISTERED_USERS_TIMEOUT = 15 * 60
+    ANON_USERS_TIMEOUT = 5 * 60 * 60
+    STATS_FRONTPAGE_TIMEOUT = 12 * 60 * 60
+    STATS_APP_TIMEOUT = 12 * 60 * 60
+    STATS_DRAFT_TIMEOUT = 24 * 60 * 60
+    N_APPS_PER_CATEGORY_TIMEOUT = 60 * 60
+    # Category cache
+    CATEGORY_TIMEOUT = 24 * 60 * 60
+    # User cache
+    USER_TIMEOUT = 15 * 60
+    USER_TOP_TIMEOUT = 24 * 60 * 60
+    USER_TOTAL_TIMEOUT = 24 * 60 * 60
 
-to::
+.. note::
+    Every value is in seconds, so bear in mind to multiply it by 60 in order to
+    have minutes in the configuration values.
 
-    CACHE_TYPE = 'simple'
+Disabling the Cache
+~~~~~~~~~~~~~~~~~~~
 
-The cache also supports other configurations, so please, check the official
-documentation of `flask-cache <http://packages.python.org/Flask-Cache/>`_.
+If you want to disable the cache, you only have to export the following env variable::
+
+    PYBOSSA_REDIS_CACHE_DISABLED='1'
+
+
+Rate limit for the API
+======================
+
+By default PyBossa limits the usage of the API with the following values::
+
+    LIMIT = 300
+    PER = 15 * 60
+
+Those values mean that when a user sends a request to an API endpoint, a window
+of 15 minutes is open, and during those 15 minutes the number of allowed
+requests to the same endpoint is 300. By adding these values to your
+settings_local.py file, you can adapt it to your own needs.
+
+.. note::
+    Please, be sure about what you are doing by modifying these values. This is
+    the recommended configuration, so do not modify it unless you are sure.
+
+
+Configuring upload method
+=========================
+
+PyBossa by default allows you to upload avatars for users, icons for apps, etc.
+using the local file system of your server. While this is nice for small
+setups, when you need to add more nodes to serve the same content, this feature
+could become a problem. For this reason, PyBossa also supports cloud solutions
+to save the files and serve them from there properly.
+
+Local Uploader
+--------------
+
+The local uploader is configured by default. We recommend to have a separate
+folder for the assets, outside the pybossa folder. In any case, for enabling
+this method use the following the config settings::
+
+    UPLOAD_METHOD = 'local'
+    UPLOAD_FOLDER = '/absolute/path/to/your/folder/to/store/assets/'
+
+Rackspace Cloud Files
+---------------------
+
+PyBossa comes with support for Rackspace CloudFiles service, allowing you to
+grow horizontally the services. Suportting cloud based system is as simple as
+having an account in Rackspace, and setting up the following config variables::
+
+    UPLOAD_METHOD = 'rackspace'
+    RACKSPACE_USERNAME = 'username'
+    RACKSPACE_API_KEY = 'api_key'
+    RACKSPACE_REGION = 'region'
+
+Once the server is started, it will authenticate against Rackspace and since
+that moment, your PyBossa server will save files in the cloud.
 
 Customizing the Layout and Front Page text
 ==========================================
@@ -330,17 +465,17 @@ And the **_gcs_form.html** will be like this::
 After these steps, your site will be indexed by Google and Google Custom Search
 will be working, providing for your users a search tool.
 
-Adding web maps for application statistics
+Adding web maps for project statistics
 ==========================================
 
-PyBossa creates for each application a statistics page, where the creators of
-the application and the volunteers can check the top 5 anonymous and
+PyBossa creates for each project a statistics page, where the creators of
+the project and the volunteers can check the top 5 anonymous and
 authenticated users, an estimation of time about when all the tasks will be
 completed, etc.
 
 One interesting feature of the statistics page is that it can generate a web
 map showing the location of the anonymous volunteers that have been
-participating in the application. By default the maps are disabled, because you
+participating in the project. By default the maps are disabled, because you
 will need to download the GeoLiteCity DAT file database that will be use for
 generating the maps.
 
@@ -382,7 +517,7 @@ Exporting data to a CKAN server
 
 CKAN_ is a powerful data management system that makes data accessible – by providing tools to streamline publishing, sharing, finding and using data. CKAN_ is aimed at data publishers (national and regional governments, companies and organizations) wanting to make their data open and available.
 
-PyBossa can export application's data to a CKAN_ server. In order to use this
+PyBossa can export project's data to a CKAN_ server. In order to use this
 feature, you will need to add the following config variables to the
 settings_loca.py file:
 
@@ -392,7 +527,7 @@ settings_loca.py file:
     CKAN_URL = "http://demo.ckan.org"
 
 As CKAN_ is open source, you can install your own CKAN_ server and configure it
-to host the data generated by your PyBossa applications quite easily, making it
+to host the data generated by your PyBossa projects quite easily, making it
 the data repository for your own projects. Another alternative is to use the
 `the Data hub`_ service that it is actually a free CKAN service for hosting your
 data.
@@ -406,7 +541,7 @@ Enforce Privacy mode
 Some projects need sometimes a way to protect their contributors due to the
 nature of the project. In this cases, where privacy is really important,
 PyBossa allows you to **lock** all the public pages related to the users and
-statistics about the site and applications. Specifically, by enabling this mode
+statistics about the site and projects. Specifically, by enabling this mode
 only administrators will be able to see the following pages:
 
  * http://server/stats
@@ -435,3 +570,33 @@ To:
 
 .. note::
     This feature is disabled by default.
+
+
+Adding your own templates
+=========================
+
+PyBossa supports different types of templates that you can offer for every
+project. By default, PyBossa comes with the following templates:
+
+ * **Basic**: the most basic template. It only has the basic structure to
+   develop your project. 
+ * **Image**: this template is for image pattern recognition.
+ * **Sound**: similar to the image template, but for sound clips hosted in
+   SoundCloud.
+ * **Video**: similar to the imaage template, but for video clips hostes in
+   Vimeo.
+ * **Map**: this template is for geocoding prorjects.
+ * **PDF**: this template is for transcribing documents.
+
+If you want to add your own template, or remove one, just create in the
+settings_local.py file a variable named **PRESENTERS** and add remove the ones
+you want::
+
+    PRESENTERS = ["basic", "image", "sound", "video", "map", "pdf", "yourtemplate"]
+
+**Yourtemplate** should be a template that you have to save in the theme
+folder: **/templates/applications/snippets/** with the same name. Check the
+other templates to use them as a base layer for your template.
+
+After adding the template, the server will start offering this new template to
+your users.
