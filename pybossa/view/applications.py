@@ -249,10 +249,10 @@ def app_index(page, lookup, category, fallback, use_count):
         if 'tutorial' not in app['short_name']:
             data.append(dict(app=app, n_tasks=cached_apps.n_tasks(app['id']),
                              overall_progress=cached_apps.overall_progress(app['id']),
-                             last_activity=cached_apps.last_activity(app['id'])))
-                         last_activity_raw=app['last_activity_raw'],
-                         n_completed_tasks=cached_apps.n_completed_tasks(app['id']),
-                         n_volunteers=cached_apps.n_volunteers(app['id'])))
+                             last_activity=cached_apps.last_activity(app['id']),
+                             last_activity_raw=app['last_activity_raw'],
+                             n_completed_tasks=cached_apps.n_completed_tasks(app['id']),
+                             n_volunteers=cached_apps.n_volunteers(app['id']))
 
     if fallback and not apps:  # pragma: no cover
         return redirect(url_for('.index'))
