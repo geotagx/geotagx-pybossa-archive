@@ -2,7 +2,7 @@
 
 ![GeoTagX](http://geotagx.org/static/img/default_logo.png) ![PyBossa] (http://pybossa.com/assets/img/pybossa_badge_light_small.png)
 
-[GeotagX] (http://geotagx.org/) is built on PyBossa. PyBossa is an open source platform for crowdsourcing online (volunteer) assistance to perform tasks that require human cognition, knowledge or intelligence. GeoTagX uses PyBossa for crowdsourcing analyses of media emerging from disasters, leading to datasets for humanitarian response efforts.  
+[GeotagX] (http://geotagx.org/) is built on PyBossa. PyBossa is an open source platform for crowdsourcing volunteer tasks that require human cognition, knowledge or intelligence. GeoTagX uses PyBossa for crowdsourcing analyses of media emerging from disasters, leading to datasets for humanitarian response efforts.  
 
 [GeotagX] (http://geotagx.org/) is led by [UNITAR-UNOSAT], (http://www.unitar.org/unosat/) based inside [CERN] (http://home.web.cern.ch/). It is part of [Citizen Cyberlab] (http://citizencyberlab.eu/), a collection of citizen science projects funded by the European Commission 7th Framework Programme for Research and Technological Development. Within Citizen Cyberlab,  GeoTagX is unique for its humanitarian focus. 
 
