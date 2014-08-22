@@ -1,20 +1,23 @@
 [![Travis CI](https://travis-ci.org/PyBossa/pybossa.png?branch=master)](https://travis-ci.org/#!/PyBossa/pybossa)  [![Coverage Status](https://coveralls.io/repos/PyBossa/pybossa/badge.png)](https://coveralls.io/r/PyBossa/pybossa?branch=master)
 
-PyBossa is an open source platform for crowd-sourcing online (volunteer)
-assistance to perform tasks that require human cognition, knowledge or
-intelligence (e.g. image classification, transcription, information location
-etc). 
+![GeoTagX](http://geotagx.org/static/img/default_logo.png) ![PyBossa] (http://pybossa.com/assets/img/pybossa_badge_light_small.png)
 
-![Shuttleworth Foundation Funded](http://pybossa.com/assets/img/shuttleworth-funded.png)
+[GeotagX] (http://geotagx.org/) is built on PyBossa. PyBossa is an open source platform for crowdsourcing online (volunteer) assistance to perform tasks that require human cognition, knowledge or intelligence. GeoTagX uses PyBossa for crowdsourcing analyses of media emerging from disasters, leading to datasets for humanitarian response efforts.  
+
+[GeotagX] (http://geotagx.org/) is led by [UNITAR-UNOSAT], (http://www.unitar.org/unosat/) based inside [CERN] (http://home.web.cern.ch/). It is part of [Citizen Cyberlab] (http://citizencyberlab.eu/), a collection of citizen science projects funded by the European Commission 7th Framework Programme for Research and Technological Development. Within Citizen Cyberlab,  GeoTagX is unique for its humanitarian focus. 
+
+We're at an early beta testing stage. You can help as a volunteer by [trying out analysing some photos with our prototype modules] (http://geotagx.org/analyse_photos) and giving us feedback about bugs or suggestions in the [issues section here] (https://github.com/geotagx/pybossa/issues). You can also [email your feedback] (mailto: cobi.smith@unitar.org) rather than share on GitHub if you prefer, though our first preference is the issues section so other volunteers to learn from your experience. 
+
+![GeoTagX](http://geotagx.org/static/img/default_logo.png) 
+![Citizen Cyberlab] (http://geotagx.org/static/img/footer/CCLlogo.jpg) 
+![UNOSAT] (http://geotagx.org/static/img/footer/logo_unitar.png) 
+![FP7] (http://geotagx.org/static/img/footer/FP7-logo%20coulor.jpg) 
+![Citizen Cyberscience Centre] (http://geotagx.org/static/img/footer/image_gallery.jpg)   
 
 PyBossa was inspired by the [BOSSA](http://bossa.berkeley.edu/) crowdsourcing engine but is written in
 python (hence the name!). It can be used for any distributed tasks project
 but was initially developed to help scientists and other researchers
 crowd-source human problem-solving skills!
-
-# See it in Action
-
-PyBossa powers [CrowdCrafting.org](http://crowdcrafting.org/) and [ForestWatchers.net](http://forestwatchers.net)
 
 # Installing and Upgrading
 
@@ -52,6 +55,9 @@ It has the instructions to become a contributor.
 
 * [FontAwesome fonts](http://fortawesome.github.com/Font-Awesome/)
 * [GeoLite data by MaxMind](http://www.maxmind.com)
+* 
+
+![Shuttleworth Foundation Funded](http://pybossa.com/assets/img/shuttleworth-funded.png)
 
 ## Copyright / License
 
