@@ -1,5 +1,7 @@
 [![Travis CI](https://travis-ci.org/PyBossa/pybossa.png?branch=master)](https://travis-ci.org/#!/PyBossa/pybossa)  [![Coverage Status](https://coveralls.io/repos/PyBossa/pybossa/badge.png)](https://coveralls.io/r/PyBossa/pybossa?branch=master)
 
+# About GeoTagX
+
 ![GeoTagX](http://geotagx.org/static/img/default_logo.png) ![PyBossa] (http://pybossa.com/assets/img/pybossa_badge_light_small.png)
 
 [GeotagX] (http://geotagx.org/) is built on PyBossa. PyBossa is an open source platform for crowdsourcing volunteer tasks that require human cognition, knowledge or intelligence. GeoTagX uses PyBossa for crowdsourcing analyses of media emerging from disasters, leading to datasets for humanitarian response efforts.  
@@ -13,6 +15,8 @@ We're at an early beta testing stage. You can help as a volunteer by [trying to 
 ![UNOSAT] (http://geotagx.org/static/img/footer/logo_unitar.png) 
 ![FP7] (http://geotagx.org/static/img/footer/FP7-logo%20coulor.jpg) 
 ![Citizen Cyberscience Centre] (http://geotagx.org/static/img/footer/image_gallery.jpg)   
+
+# About PyBossa
 
 PyBossa was inspired by the [BOSSA](http://bossa.berkeley.edu/) crowdsourcing engine but is written in
 python (hence the name!). It can be used for any distributed tasks project
