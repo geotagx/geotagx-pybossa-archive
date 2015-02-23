@@ -1,0 +1,21 @@
+<ecml version="1">
+<model>
+<submission id="geotagxtest" projectName="geotagxTEST" allowDownloadEdits="false" versionNumber="2.1"/>
+<uploadToServer>http://www.geotagx.org/get_xml_epicollect</uploadToServer>
+<downloadFromServer>http://plus.epicollect.net/geotagxTEST/download</downloadFromServer>
+</model>
+<form num="1" name="geotagtest" key="geotagtest_key" main="true">
+<input ref="geotagtest_key" required="true" genkey="true">
+<label>Unique ID</label>
+</input>
+<input ref="text" required="true">
+<label>Testo</label>
+</input>
+<photo ref="url">
+<label>IMG</label>
+</photo>
+<location ref="coords">
+<label>Coords</label>
+</location>
+</form>
+</ecml>

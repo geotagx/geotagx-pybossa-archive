@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% set active_page = "about" %}
+
+{% block content %}
+    {% include ['custom/_find_photos.html', 'home/_find_photos.html'] ignore missing %}
+{% endblock %}

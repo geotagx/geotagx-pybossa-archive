@@ -407,6 +407,8 @@ class User(db.Model, DomainObject, flask.ext.login.UserMixin):
     ckan_api = Column(String, unique=True)
     #: arbitrary additional information about the user in a JSON dict.
     info = Column(JSONType, default=dict)
+	#: UNOSAT column for survey_check.
+    survey_check = Column(Unicode(length=30))
 
     def get_id(self):
         '''id for login system. equates to name'''

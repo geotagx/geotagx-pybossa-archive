@@ -314,6 +314,30 @@ def new_task(app_id):
     except Exception as e:
         return error.format_exception(e, target='app', action='GET')
 
+@jsonpify
+@blueprint.route('/app/<app_id>/<son_app_id>/newtask2')
+@crossdomain(origin='*', headers=cors_headers)
+@ratelimit(limit=300, per=15*60)
+def new_task2(app_id,son_app_id):
+    # Check if the request has an arg:
+    try:
+        app = db.session.query(model.App).get(app_id)
+        if app is None:
+            raise NotFound
+        if request.args.get('offset'):
+            offset = int(request.args.get('offset'))
+        else:
+            offset = 0
+        user_id = None if current_user.is_anonymous() else current_user.id
+        user_ip = request.remote_addr if current_user.is_anonymous() else None
+        task = sched.new_task2(app_id, user_id, user_ip, offset, son_app_id)
+        # If there is a task for the user, return it
+        if task:
+            return Response(json.dumps(task.dictize()), mimetype="application/json")
+        else:
+            return Response(json.dumps({}), mimetype="application/json")
+    except Exception as e:
+        return error.format_exception(e, target='app', action='GET')
 
 @jsonpify
 @blueprint.route('/app/<short_name>/userprogress')

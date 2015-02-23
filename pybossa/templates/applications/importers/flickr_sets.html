@@ -1,0 +1,40 @@
+{% extends "/base.html" %}
+{% set active_page = "applications" %}
+{% set active_app  = app.short_name %}
+{% import "applications/_helpers.html" as helper %}
+
+{% block content %}
+{% from "_formhelpers.html" import render_field %}
+{{ helper.render_loading(loading_text) }}
+<div class="row">
+    <div class="col-sm-3">
+        {{ helper.render_app_local_nav(app, 'tasks', current_user)}}
+    </div>
+    <div class="col-sm-9">
+        <h1><strong>{{app.name}}</strong>: {{_('Import tasks')}}</h1>
+      {% if csvform %}
+      <h2>{{_('From a Flickr file')}}</h2>
+      <form class="form-horizontal" method="post" onSubmit="flickr_mod();" action="{{ url_for('app.import_task', short_name=app.short_name) }}">
+        <fieldset>
+        {{ csvform.hidden_tag() }}
+        <span class="help-inline">{{_('Please provide the ID to a Flickr Set')}}. You can find the ID of a set in the URL, it's the only number in the URL when browsing the list of photos in a set. {{ active_app }}.<br/></span>
+          {{ render_field(csvform.csv_url, class_="input-block-level", placeholder="The ID of the Set") }}
+          <div class="form-actions">
+            <input id="submit" type="submit" value="{{_('Import')}}" class="btn btn-primary" />
+            <a href="{{ url_for('app.settings', short_name=app.short_name) }}" class="btn">{{_('Cancel')}}</a>
+          </div>
+        </fieldset>
+      </form>
+      {% endif %}
+    </div>
+</div>
+<script>
+	function flickr_mod() {
+		$('#csv_url').val('http://www.geotagx.org/get_flickr_set?set_url='+$('#csv_url').val());
+		return true;
+	}
+    $("#submit").off('click').on('click', function(){
+        $("#loading").show();
+    });
+</script>
+{% endblock %}

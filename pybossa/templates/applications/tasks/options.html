@@ -1,15 +1,33 @@
-<div class="row-fluid">
-    <div class="span12">
+<div class="row">
+    <div class="col-sm-12">
         <p class="lead">Use one of the following available <strong>templates</strong> to import tasks</p>
     </div>
 </div>
 {% for left_tmpl, right_tmpl in importer_variants %}
-<div class="row-fluid">
-    <div class="span6">
+<div class="row">
+    <div class="col-sm-6">
       {% include left_tmpl %}
     </div>
-    <div class="span6">
+    <div class="col-sm-6">
 	  {% include right_tmpl %}
     </div>
 </div>
 {% endfor %}
+<div class="row">
+    <div class="col-sm-6">
+	<h5>You can use a Flickr Gallery by simpling pasting a gallery URL in the input.</h5>
+      <div class="well">
+  <h2><i class="icon-external-link"></i> Flickr Gallery Importer</h2> 
+  <h3>Use a Flickr Gallery URL</h3>
+  <p><a href="{{url_for('app.import_task', short_name=app.short_name, template='flickr_gallery')}}" class="btn btn-inverse">Use Flickr Importer</a></p>
+</div>
+    </div>
+	<div class="col-sm-6">
+	<h5>You can use a Flickr Set by simpling pasting a Set ID in the input.</h5>
+      <div class="well">
+  <h2><i class="icon-external-link"></i> Flickr Set Importer</h2> 
+  <h3>Use a Flickr Set URL</h3>
+  <p><a href="{{url_for('app.import_task', short_name=app.short_name, template='flickr_sets')}}" class="btn btn-inverse">Use Flickr Importer</a></p>
+</div>
+    </div>
+</div>
