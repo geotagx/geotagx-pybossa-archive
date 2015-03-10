@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set active_page = "survey_check" %}
+
+{% block content %}
+
+<p><strong>Citizen Cyberlab Surveys &amp; Interviews</strong></p><div><p>Being part of the research will not take up much time. We will ask you to fill in a couple of online surveys, one now and one later on, after you have had some experience working on Geotag-X. You may also be contacted by the researchers for an interview and / or to complete future surveys as the research evolves. The below information tells you about our research and highlight issues concerning your participation.</p><p><strong>I. Purpose of the Investigation</strong></p><p>The aim of our research is to explore volunteers&rsquo; engagement and motivation to participate in online citizen science projects. We are also interested in issues such as learning and creativity. By conducting surveys and interviews, we are hoping to gain a greater understanding of why people take part in the various aspects of these projects and what they get out of the experience.</p><p><strong>II. Confidentiality and Voluntary Participation</strong></p><p>All information provided will be treated confidentially, as specified by the Data Protection Act, 1998. If published, you will not be identifiable from the data.</p><p>Participation is completely voluntary. You therefore have the right to withdraw from the survey and/or interview at any time, without fear of consequence.&nbsp; If requested, your data can be destroyed.</p><p><strong>III. Questions</strong></p><p>Please feel free to ask any questions you might have regarding the surveys and/or interviews. The lead researcher for evaluating GeoTag-X is:</p><p>&middot;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Dr Charlene Jennett, University College London. Email:&nbsp;<a href="mailto:charlene.jennett@ucl.ac.uk" target="_blank">charlene.jennett@ucl.ac.uk</a></p><p>&nbsp;</p>
+
+<a id="take_survey" class="btn btn-success" type="button" data-toggle="modal" data-target="#myModal">Yes Take Survey</a>
+<a id="do_not_take_survey" class="btn btn-danger" type="button" href="/survey_check_no">No Thanks</a>
+
+<br/><br/>
+<p>For more information about the project, you can also visit the Citizen Cyberlab website:<a href="http://citizencyberlab.com/" target="_blank">http://citizencyberlab.com/</a></p></div><p>&nbsp;</p>
+
+<!-- Modal -->
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title" id="myModalLabel">Geotag-X Survey</h4>
+      </div>
+      <div class="modal-body">
+          <iframe id="geo-tag-x-survey" src="http://tecfalabs.unige.ch/survey/index.php/788927/newtest/Y?UserID={{current_user.id}}" seamless width="100%" height="600px" allowtransparency="true"></iframe>  
+      </div>
+    </div>
+    <!-- /.modal-content -->
+  </div>
+  <!-- /.modal-dialog -->
+</div>
+<!-- /.modal -->
+
+
+<script type="text/javascript">
+$('#myModal').on('hidden.bs.modal', function(){
+  window.location.href="/survey_check_yes";
+});
+</script>
+
+{% endblock %}
+

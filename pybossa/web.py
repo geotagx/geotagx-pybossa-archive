@@ -216,6 +216,50 @@ def api_authentication():
         if user:
             _request_ctx_stack.top.user = user
 
+@app.route('/survey_check_complete')
+def survey_check_complete():
+    """ Records completion of taking surveys"""
+    if current_user.is_authenticated() and current_user.survey_check == "YES":
+        current_user.survey_check = "COMPLETE"
+        db.session.commit()
+    return redirect(url_for('home')) 
+
+@app.route('/survey_check_yes')
+def survey_check_yes():
+    """ Records user's opinion to  keep taking surveys"""
+    if current_user.is_authenticated():
+        current_user.survey_check = "YES"
+        db.session.commit()
+    return redirect(url_for('home')) 
+
+@app.route('/survey_check_no')
+def survey_check_no():
+    """ Records user's opinion to not keep taking surveys"""
+    if current_user.is_authenticated():
+        current_user.survey_check = "NO"
+        db.session.commit()
+    return redirect(url_for('home'))    
+
+"""
+DEBUG CODE
+"""
+@app.route('/survey_check_none')
+def survey_check_none():
+    """ Records user's opinion to not keep taking surveys"""
+    if current_user.is_authenticated():
+        current_user.survey_check = "None"
+        db.session.commit()
+    return redirect(url_for('home'))   
+
+@app.route('/survey_check')
+def survey_check():
+    """ Check Survey requirements for geotagx """
+    d = {}
+    print current_user
+    if current_user.is_authenticated() and current_user.survey_check != "NO" :
+        return render_template('/survey_check/survey_check.html', **d)
+    else:
+        return redirect(url_for('home'))
 
 @app.route('/')
 def home():
@@ -243,36 +287,22 @@ def home():
     d['n_apps_per_category'] = n_apps_per_category
     d['apps'] = apps
     # Current user Survey System
+    print current_user
     if current_user.is_authenticated():
-        sql = text('''SELECT COUNT(task_run.id) AS task_run FROM task_run WHERE :cur_user_id=task_run.user_id''')
-        results = db.engine.execute(sql,cur_user_id=current_user.id)
-        for row in results:
-            num_run_task=row.task_run
-    if current_user.is_authenticated() and current_user.survey_check!= "None" and current_user.survey_check == "2":
-        if num_run_task>=30:
-			d['survey_three'] = True
-			new_profile = model.User(id=current_user.id, survey_check="3")
-			db.session.query(model.User).filter(model.User.id == current_user.id).first()
-			db.session.merge(new_profile)
-			db.session.commit()
-			cached_users.delete_user_summary(current_user.name)
-    elif current_user.is_authenticated() and current_user.survey_check!= "None" and current_user.survey_check == "1":
-        if num_run_task>=1:
-			d['survey_two'] = True
-			new_profile = model.User(id=current_user.id, survey_check="2")
-			db.session.query(model.User).filter(model.User.id == current_user.id).first()
-			db.session.merge(new_profile)
-			db.session.commit()
-			cached_users.delete_user_summary(current_user.name)
-    elif current_user.is_authenticated() and current_user.survey_check!= "None" and current_user.survey_check == "0":
-        d['survey_one'] = True
-        new_profile = model.User(id=current_user.id, survey_check="1")
-        db.session.query(model.User).filter(model.User.id == current_user.id).first()
-        db.session.merge(new_profile)
-        db.session.commit()
-        cached_users.delete_user_summary(current_user.name)
-    else:
-        d['survey_one'] = False
+        # Check if survey_check is None
+        # That is the case of a first time registration
+        if current_user.survey_check == "None" :
+            return redirect(url_for('survey_check'))
+        if current_user.survey_check == "YES" :
+            sql = text('''SELECT COUNT(task_run.id) AS task_run FROM task_run WHERE :cur_user_id=task_run.user_id''')
+            results = db.engine.execute(sql,cur_user_id=current_user.id)
+            num_run_task = 0
+            for row in results:
+                num_run_task = row.task_run
+            print "Number of tasks run : ",num_run_task
+            if num_run_task > 5:
+                return render_template('/survey_check/survey_check_complete.html', **d)
+
 	# @FC
     return render_template('/home/index.html', **d)
 
