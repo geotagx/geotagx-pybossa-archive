@@ -300,7 +300,7 @@ def home():
             for row in results:
                 num_run_task = row.task_run
             print "Number of tasks run : ",num_run_task
-            if num_run_task > 5:
+            if num_run_task > 30:
                 return render_template('/survey_check/survey_check_complete.html', **d)
 
 	# @FC
